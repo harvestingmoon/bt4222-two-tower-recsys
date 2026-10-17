@@ -1,0 +1,38 @@
+# CPU smoke test: every stage end to end on a 2,000-user subsample with tiny models (a few minutes).
+# It proves the code runs; the metrics it prints are meaningless.
+base: default.yaml
+scope: sample_2000
+device: cpu
+features:
+  chunk_users: 800
+  bm25: {k1: 1.2, b: 0.75, idf_docs: 50000}
+tower:
+  d: 32
+  d_term: 16
+  d_id: 8
+  d_pop: 4
+  seg_len: {short: 10, mid: 6, long: 6}
+  max_terms: 50000
+  term_count_docs: 100000
+  slate_batch: 16
+  epochs: 1
+  aux: {enabled: true, max_age_days: 7, batch: 128, weight: 0.5, every: 2}
+  amp: false
+  item_matrix_on_gpu: false
+  eval_batch_users: 128
+  log_every: 20
+ranker:
+  num_boost_round: 30
+  early_stopping_rounds: 10
+  params: {min_data_in_leaf: 20, num_leaves: 15}
+prior_ncf:
+  epochs: 1
+  maxlen: 50
+  d: 16
+  hidden: 32
+eda:
+  sample_users: 1000
+diagnostics:
+  shap_rows: 2000
+  ablation_user_frac: 1.0
+  attention_users: 256

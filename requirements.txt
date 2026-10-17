@@ -1,0 +1,14 @@
+# Python 3.11 or 3.12. Install PyTorch first with the command for your CUDA version from
+# https://pytorch.org/get-started/locally/  (e.g. pip install torch --index-url https://download.pytorch.org/whl/cu124)
+# then: pip install -r requirements.txt
+# polars and lightgbm are pinned to the versions the pipeline was tested with.
+torch>=2.3
+numpy>=1.26
+polars==1.44.2
+pyarrow>=15
+lightgbm==4.7.0
+scikit-learn>=1.4
+matplotlib>=3.8
+pyyaml>=6
+ipykernel>=6.28
+pytest>=8
