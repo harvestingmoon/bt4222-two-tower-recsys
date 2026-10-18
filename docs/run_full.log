@@ -1,0 +1,312 @@
+
+=================== 00_prepare.py 06:38:54
+06:38:54 prepare | full data already prepared in /home/ubuntu/bt4222-two-tower-recsys/outputs/full/data (use --force to rebuild)
+
+=================== 01_eda.py 06:38:54
+06:39:01 eda | retention windows:
+shape: (4, 7)
+┌──────┬──────────┬───────────┬────────────┬────────────┬────────────┬───────────┐
+│ type ┆ n        ┆ p50       ┆ p99        ┆ p999       ┆ max        ┆ type_name │
+│ ---  ┆ ---      ┆ ---       ┆ ---        ┆ ---        ┆ ---        ┆ ---       │
+│ i8   ┆ u32      ┆ f32       ┆ f32        ┆ f32        ┆ f32        ┆ str       │
+╞══════╪══════════╪═══════════╪════════════╪════════════╪════════════╪═══════════╡
+│ 1    ┆ 8298894  ┆ 2.791979  ┆ 6.489595   ┆ 6.885313   ┆ 13.145312  ┆ CLICK     │
+│ 2    ┆ 24579    ┆ 39.443935 ┆ 87.698425  ┆ 89.359146  ┆ 89.986595  ┆ FLW       │
+│ 3    ┆ 11526504 ┆ 38.373692 ┆ 88.306122  ┆ 89.458969  ┆ 635.289856 ┆ CART      │
+│ 4    ┆ 6817283  ┆ 154.0802  ┆ 359.576172 ┆ 363.995087 ┆ 364.98645  ┆ ORD       │
+└──────┴──────────┴───────────┴────────────┴────────────┴────────────┴───────────┘
+06:39:01 eda | recency confound: {'corr_click_ratio_vs_recent_share': 0.9531554961566895, 'users_without_clicks': 0.16213448694421595, 'n_users': 173831}; popularity AUC by window: {'all_events': 0.7000084278821874, 'click_7': 0.687174984160263, 'cart_90': 0.6830646133614267, 'order_365': 0.6446947759797665}
+
+=================== 02_features.py 06:39:01
+06:39:11 features | global tables in 10s
+06:39:23 features | chunk 0: 20,000 users, 1,777,726 rows, 105 features (22s)
+06:39:36 features | chunk 1: 20,000 users, 1,785,821 rows, 105 features (35s)
+06:39:48 features | chunk 2: 20,000 users, 1,781,631 rows, 105 features (47s)
+06:40:01 features | chunk 3: 20,000 users, 1,778,446 rows, 105 features (60s)
+06:40:13 features | chunk 4: 20,000 users, 1,789,049 rows, 105 features (72s)
+06:40:25 features | chunk 5: 20,000 users, 1,782,074 rows, 105 features (84s)
+06:40:38 features | chunk 6: 20,000 users, 1,784,465 rows, 105 features (97s)
+06:40:50 features | chunk 7: 20,000 users, 1,792,313 rows, 105 features (109s)
+06:41:00 features | chunk 8: 13,831 users, 1,238,487 rows, 105 features (119s)
+105 features
+
+=================== 02b_baselines.py 06:41:00
+06:41:06 baselines | ensemble weight on BM25 picked on validation: 0.0 (gNDCG@10 by weight: {0.0: np.float64(0.3329), 0.1: np.float64(0.3299), 0.25: np.float64(0.3054), 0.5: np.float64(0.2745), 1.0: np.float64(0.2245), 2.0: np.float64(0.1723)})
+06:41:06 baselines | 
+shape: (11, 9)
+┌──────────────────────────────┬────────┬────────┬────────┬───┬────────┬────────┬────────┬─────────┐
+│ model                        ┆ mrr    ┆ p1     ┆ ndcg10 ┆ … ┆ hr10   ┆ r10    ┆ r50    ┆ n_users │
+│ ---                          ┆ ---    ┆ ---    ┆ ---    ┆   ┆ ---    ┆ ---    ┆ ---    ┆ ---     │
+│ str                          ┆ f64    ┆ f64    ┆ f64    ┆   ┆ f64    ┆ f64    ┆ f64    ┆ i64     │
+╞══════════════════════════════╪════════╪════════╪════════╪═══╪════════╪════════╪════════╪═════════╡
+│ Random [test]                ┆ 0.1005 ┆ 0.0298 ┆ 0.085  ┆ … ┆ 0.2266 ┆ 0.1599 ┆ 0.6081 ┆ 17174   │
+│ Popularity: users who        ┆ 0.3435 ┆ 0.2012 ┆ 0.3525 ┆ … ┆ 0.6526 ┆ 0.5403 ┆ 0.866  ┆ 17174   │
+│ interact…                    ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Popularity: clicks, last 7   ┆ 0.3311 ┆ 0.1915 ┆ 0.3386 ┆ … ┆ 0.6349 ┆ 0.5207 ┆ 0.8403 ┆ 17174   │
+│ day…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Popularity: carts, last 90   ┆ 0.3344 ┆ 0.1952 ┆ 0.3424 ┆ … ┆ 0.6353 ┆ 0.5237 ┆ 0.8459 ┆ 17174   │
+│ day…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Popularity: orders, last 365 ┆ 0.2929 ┆ 0.1649 ┆ 0.2954 ┆ … ┆ 0.5646 ┆ 0.4578 ┆ 0.7942 ┆ 17174   │
+│ d…                           ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ …                            ┆ …      ┆ …      ┆ …      ┆ … ┆ …      ┆ …      ┆ …      ┆ …       │
+│ Query-item CTR (training     ┆ 0.1898 ┆ 0.1069 ┆ 0.1727 ┆ … ┆ 0.3394 ┆ 0.2577 ┆ 0.5932 ┆ 17174   │
+│ users…                       ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Query-item history           ┆ 0.2441 ┆ 0.1399 ┆ 0.2343 ┆ … ┆ 0.4461 ┆ 0.352  ┆ 0.7084 ┆ 17174   │
+│ engagement …                 ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ BM25 (query vs item text)    ┆ 0.1096 ┆ 0.0385 ┆ 0.0959 ┆ … ┆ 0.2352 ┆ 0.1734 ┆ 0.6327 ┆ 17174   │
+│ [tes…                        ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ User affinity: same category ┆ 0.1106 ┆ 0.0353 ┆ 0.0969 ┆ … ┆ 0.2508 ┆ 0.1813 ┆ 0.65   ┆ 17174   │
+│ c…                           ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Popularity + 0.0 x BM25      ┆ 0.3311 ┆ 0.1915 ┆ 0.3386 ┆ … ┆ 0.6349 ┆ 0.5207 ┆ 0.8403 ┆ 17174   │
+│ [test]                       ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+└──────────────────────────────┴────────┴────────┴────────┴───┴────────┴────────┴────────┴─────────┘
+
+=================== 02c_prior_ncf.py 06:41:06
+06:41:38 prior_ncf | [fixed] epoch 1: train loss 1.3315 val loss 1.2874 (22s)
+06:42:00 prior_ncf | [fixed] epoch 2: train loss 1.2804 val loss 1.2673 (21s)
+06:42:21 prior_ncf | [fixed] epoch 3: train loss 1.2525 val loss 1.2556 (21s)
+06:42:45 prior_ncf | [published] epoch 1: train loss 1.2979 val loss 1.2618 (21s)
+06:43:05 prior_ncf | [published] epoch 2: train loss 1.2624 val loss 1.2556 (21s)
+06:43:26 prior_ncf | [published] epoch 3: train loss 1.2526 val loss 1.2537 (21s)
+06:43:28 prior_ncf | 
+shape: (4, 9)
+┌──────────────────────────────┬────────┬────────┬────────┬───┬────────┬────────┬────────┬─────────┐
+│ model                        ┆ mrr    ┆ p1     ┆ ndcg10 ┆ … ┆ hr10   ┆ r10    ┆ r50    ┆ n_users │
+│ ---                          ┆ ---    ┆ ---    ┆ ---    ┆   ┆ ---    ┆ ---    ┆ ---    ┆ ---     │
+│ str                          ┆ f64    ┆ f64    ┆ f64    ┆   ┆ f64    ┆ f64    ┆ f64    ┆ i64     │
+╞══════════════════════════════╪════════╪════════╪════════╪═══╪════════╪════════╪════════╪═════════╡
+│ Prior team Hybrid NCF+LSTM   ┆ 0.1708 ┆ 0.0734 ┆ 0.1644 ┆ … ┆ 0.3706 ┆ 0.2851 ┆ 0.7288 ┆ 17174   │
+│ (fi…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Prior team Hybrid NCF+LSTM   ┆ 0.5545 ┆ 0.3378 ┆ 0.6265 ┆ … ┆ 0.9926 ┆ 0.9231 ┆ 0.9982 ┆ 17174   │
+│ (fi…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Prior team Hybrid NCF+LSTM   ┆ 0.135  ┆ 0.0597 ┆ 0.122  ┆ … ┆ 0.2812 ┆ 0.2055 ┆ 0.5286 ┆ 17174   │
+│ (pu…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Prior team Hybrid NCF+LSTM   ┆ 0.4524 ┆ 0.2429 ┆ 0.5402 ┆ … ┆ 0.9787 ┆ 0.9013 ┆ 0.9978 ┆ 17174   │
+│ (pu…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+└──────────────────────────────┴────────┴────────┴────────┴───┴────────┴────────┴────────┴─────────┘
+
+=================== 03_train_tower.py 06:43:29
+06:44:25 tower | assets: 12,319,978 items, 320,673 term rows, 1,740,830 queries (55s)
+06:44:34 tower | [fold0] 68,731 training slates, 2,865,889 auxiliary anchors, 33,886,017 parameters, device=cuda
+06:44:45 tower | [fold0] ep 0 step 200/1073 loss 5.6216 aux 3.5844 scale 18.4 (10s)
+06:44:55 tower | [fold0] ep 0 step 400/1073 loss 5.1080 aux 2.8254 scale 17.9 (20s)
+06:45:04 tower | [fold0] ep 0 step 600/1073 loss 4.8129 aux 2.2283 scale 18.1 (30s)
+06:45:14 tower | [fold0] ep 0 step 800/1073 loss 4.6341 aux 1.8871 scale 18.7 (40s)
+06:45:24 tower | [fold0] ep 0 step 1000/1073 loss 4.5031 aux 1.6424 scale 19.1 (50s)
+06:45:29 tower | [fold0] epoch 0: val MRR 0.3425 NDCG@10 0.3483 gNDCG@10 0.3441 (55s)
+06:45:35 tower | [fold0] ep 1 step 127/1073 loss 4.2620 aux 1.4271 scale 19.8 (6s)
+06:45:45 tower | [fold0] ep 1 step 327/1073 loss 4.2315 aux 1.3868 scale 20.4 (16s)
+06:45:55 tower | [fold0] ep 1 step 527/1073 loss 4.2277 aux 1.3147 scale 20.8 (26s)
+06:46:05 tower | [fold0] ep 1 step 727/1073 loss 4.1802 aux 1.2820 scale 21.1 (36s)
+06:46:15 tower | [fold0] ep 1 step 927/1073 loss 4.1502 aux 1.2424 scale 21.4 (46s)
+06:46:23 tower | [fold0] epoch 1: val MRR 0.3515 NDCG@10 0.3572 gNDCG@10 0.3531 (54s)
+06:46:25 tower | [fold0] ep 2 step 54/1073 loss 3.9193 aux 1.1541 scale 21.9 (3s)
+06:46:35 tower | [fold0] ep 2 step 254/1073 loss 3.8589 aux 1.1587 scale 22.4 (13s)
+06:46:45 tower | [fold0] ep 2 step 454/1073 loss 3.8429 aux 1.1392 scale 22.7 (23s)
+06:46:55 tower | [fold0] ep 2 step 654/1073 loss 3.8137 aux 1.1311 scale 22.8 (33s)
+06:47:05 tower | [fold0] ep 2 step 854/1073 loss 3.8266 aux 1.1200 scale 22.8 (42s)
+06:47:15 tower | [fold0] ep 2 step 1054/1073 loss 3.8103 aux 1.1209 scale 22.9 (52s)
+06:47:17 tower | [fold0] epoch 2: val MRR 0.3421 NDCG@10 0.3463 gNDCG@10 0.3423 (54s)
+06:47:17 tower | [fold1] 68,651 training slates, 2,865,889 auxiliary anchors, 33,886,017 parameters, device=cuda
+06:47:27 tower | [fold1] ep 0 step 200/1072 loss 5.6095 aux 3.5758 scale 18.4 (10s)
+06:47:37 tower | [fold1] ep 0 step 400/1072 loss 5.0840 aux 2.7671 scale 18.1 (20s)
+06:47:47 tower | [fold1] ep 0 step 600/1072 loss 4.7600 aux 2.0896 scale 18.3 (30s)
+06:47:57 tower | [fold1] ep 0 step 800/1072 loss 4.5814 aux 1.7788 scale 18.7 (40s)
+06:48:07 tower | [fold1] ep 0 step 1000/1072 loss 4.4739 aux 1.5920 scale 19.2 (50s)
+06:48:11 tower | [fold1] epoch 0: val MRR 0.3442 NDCG@10 0.3526 gNDCG@10 0.3483 (54s)
+06:48:18 tower | [fold1] ep 1 step 128/1072 loss 4.2566 aux 1.4263 scale 19.9 (6s)
+06:48:28 tower | [fold1] ep 1 step 328/1072 loss 4.2443 aux 1.3728 scale 20.2 (16s)
+06:48:37 tower | [fold1] ep 1 step 528/1072 loss 4.2124 aux 1.3134 scale 20.6 (26s)
+06:48:47 tower | [fold1] ep 1 step 728/1072 loss 4.1893 aux 1.2696 scale 20.9 (36s)
+06:48:57 tower | [fold1] ep 1 step 928/1072 loss 4.1514 aux 1.2294 scale 21.2 (46s)
+06:49:05 tower | [fold1] epoch 1: val MRR 0.3539 NDCG@10 0.3588 gNDCG@10 0.3552 (53s)
+06:49:08 tower | [fold1] ep 2 step 56/1072 loss 3.8725 aux 1.1496 scale 21.7 (3s)
+06:49:18 tower | [fold1] ep 2 step 256/1072 loss 3.8882 aux 1.1610 scale 22.1 (13s)
+06:49:27 tower | [fold1] ep 2 step 456/1072 loss 3.8402 aux 1.1405 scale 22.3 (23s)
+06:49:37 tower | [fold1] ep 2 step 656/1072 loss 3.8502 aux 1.1339 scale 22.5 (33s)
+06:49:47 tower | [fold1] ep 2 step 856/1072 loss 3.8386 aux 1.1235 scale 22.5 (42s)
+06:49:57 tower | [fold1] ep 2 step 1056/1072 loss 3.8426 aux 1.1288 scale 22.5 (52s)
+06:49:59 tower | [fold1] epoch 2: val MRR 0.3475 NDCG@10 0.3507 gNDCG@10 0.3467 (54s)
+06:49:59 tower | [full] 137,382 training slates, 2,865,889 auxiliary anchors, 33,886,017 parameters, device=cuda
+06:50:09 tower | [full] ep 0 step 200/2146 loss 5.6392 aux 3.6290 scale 19.0 (10s)
+06:50:19 tower | [full] ep 0 step 400/2146 loss 5.2216 aux 3.0324 scale 18.0 (20s)
+06:50:29 tower | [full] ep 0 step 600/2146 loss 4.8560 aux 2.3056 scale 18.0 (30s)
+06:50:39 tower | [full] ep 0 step 800/2146 loss 4.6413 aux 1.8859 scale 18.4 (40s)
+06:50:49 tower | [full] ep 0 step 1000/2146 loss 4.5126 aux 1.6480 scale 18.8 (50s)
+06:50:59 tower | [full] ep 0 step 1200/2146 loss 4.4186 aux 1.5000 scale 19.2 (59s)
+06:51:09 tower | [full] ep 0 step 1400/2146 loss 4.3944 aux 1.4372 scale 19.4 (69s)
+06:51:19 tower | [full] ep 0 step 1600/2146 loss 4.3283 aux 1.3594 scale 19.9 (79s)
+06:51:28 tower | [full] ep 0 step 1800/2146 loss 4.3045 aux 1.3177 scale 20.1 (89s)
+06:51:38 tower | [full] ep 0 step 2000/2146 loss 4.2842 aux 1.2710 scale 20.3 (99s)
+06:51:46 tower | [full] epoch 0: val MRR 0.3519 NDCG@10 0.3596 gNDCG@10 0.3553 (107s)
+06:51:49 tower | [full] ep 1 step 54/2146 loss 4.1137 aux 1.2271 scale 20.8 (3s)
+06:51:59 tower | [full] ep 1 step 254/2146 loss 4.1395 aux 1.1999 scale 21.1 (13s)
+06:52:09 tower | [full] ep 1 step 454/2146 loss 4.1066 aux 1.1788 scale 21.4 (23s)
+06:52:19 tower | [full] ep 1 step 654/2146 loss 4.0943 aux 1.1610 scale 21.6 (32s)
+06:52:29 tower | [full] ep 1 step 854/2146 loss 4.0838 aux 1.1409 scale 21.9 (42s)
+06:52:38 tower | [full] ep 1 step 1054/2146 loss 4.0768 aux 1.1274 scale 22.1 (52s)
+06:52:48 tower | [full] ep 1 step 1254/2146 loss 4.0406 aux 1.0935 scale 22.4 (62s)
+06:52:58 tower | [full] ep 1 step 1454/2146 loss 4.0285 aux 1.0801 scale 22.6 (72s)
+06:53:08 tower | [full] ep 1 step 1654/2146 loss 4.0346 aux 1.0785 scale 22.9 (82s)
+06:53:18 tower | [full] ep 1 step 1854/2146 loss 4.0206 aux 1.0580 scale 23.1 (92s)
+06:53:28 tower | [full] ep 1 step 2054/2146 loss 4.0224 aux 1.0528 scale 23.4 (102s)
+06:53:33 tower | [full] epoch 1: val MRR 0.3603 NDCG@10 0.3657 gNDCG@10 0.3616 (107s)
+06:53:39 tower | [full] ep 2 step 108/2146 loss 3.7893 aux 1.0077 scale 23.9 (5s)
+06:53:49 tower | [full] ep 2 step 308/2146 loss 3.7636 aux 1.0168 scale 24.3 (15s)
+06:53:58 tower | [full] ep 2 step 508/2146 loss 3.7537 aux 1.0061 scale 24.6 (25s)
+06:54:08 tower | [full] ep 2 step 708/2146 loss 3.7541 aux 0.9908 scale 24.7 (35s)
+06:54:18 tower | [full] ep 2 step 908/2146 loss 3.7264 aux 0.9793 scale 24.8 (45s)
+06:54:28 tower | [full] ep 2 step 1108/2146 loss 3.7648 aux 0.9762 scale 24.9 (55s)
+06:54:38 tower | [full] ep 2 step 1308/2146 loss 3.7453 aux 0.9736 scale 24.9 (65s)
+06:54:48 tower | [full] ep 2 step 1508/2146 loss 3.7563 aux 0.9783 scale 25.0 (75s)
+06:54:58 tower | [full] ep 2 step 1708/2146 loss 3.7441 aux 0.9733 scale 25.0 (85s)
+06:55:08 tower | [full] ep 2 step 1908/2146 loss 3.7297 aux 0.9680 scale 25.0 (95s)
+06:55:18 tower | [full] ep 2 step 2108/2146 loss 3.7253 aux 0.9700 scale 25.0 (105s)
+06:55:20 tower | [full] epoch 2: val MRR 0.3536 NDCG@10 0.3573 gNDCG@10 0.3534 (107s)
+
+=================== 04_score_tower.py 06:55:21
+06:55:33 tower | [fold0] scored 69,743 users / 6,215,498 rows
+06:55:35 tower | [fold1] scored 69,742 users / 6,226,580 rows
+06:55:36 tower | [full] scored 34,346 users / 3,067,934 rows
+06:55:39 tower | 
+shape: (3, 9)
+┌──────────────────┬────────┬────────┬────────┬───┬────────┬────────┬────────┬─────────┐
+│ model            ┆ mrr    ┆ p1     ┆ ndcg10 ┆ … ┆ hr10   ┆ r10    ┆ r50    ┆ n_users │
+│ ---              ┆ ---    ┆ ---    ┆ ---    ┆   ┆ ---    ┆ ---    ┆ ---    ┆ ---     │
+│ str              ┆ f64    ┆ f64    ┆ f64    ┆   ┆ f64    ┆ f64    ┆ f64    ┆ i64     │
+╞══════════════════╪════════╪════════╪════════╪═══╪════════╪════════╪════════╪═════════╡
+│ two-tower [train ┆ 0.3501 ┆ 0.2085 ┆ 0.3561 ┆ … ┆ 0.6553 ┆ 0.5403 ┆ 0.8733 ┆ 137382  │
+│ (out-of-fold)…   ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ two-tower [val]  ┆ 0.3603 ┆ 0.2172 ┆ 0.3657 ┆ … ┆ 0.6696 ┆ 0.5516 ┆ 0.8802 ┆ 17172   │
+│ two-tower [test] ┆ 0.3576 ┆ 0.216  ┆ 0.3639 ┆ … ┆ 0.6612 ┆ 0.5473 ┆ 0.8789 ┆ 17174   │
+└──────────────────┴────────┴────────┴────────┴───┴────────┴────────┴────────┴─────────┘
+
+=================== 05_train_ranker.py 06:55:40
+06:55:46 ranker | [ranker] train 137,382 slates / 12,280,783 rows, val 17,172 slates, 108 features (6s)
+[150]	val's ndcg@1: 0.286577	val's ndcg@10: 0.445271
+[300]	val's ndcg@1: 0.291247	val's ndcg@10: 0.45036
+[450]	val's ndcg@1: 0.293376	val's ndcg@10: 0.451824
+[600]	val's ndcg@1: 0.293335	val's ndcg@10: 0.452131
+[750]	val's ndcg@1: 0.295406	val's ndcg@10: 0.453239
+07:00:53 ranker | [ranker] best iteration 691, val {'ndcg@1': np.float64(0.29575832196377266), 'ndcg@10': np.float64(0.45302345058097254)} (312s)
+07:00:53 ranker | top features by gain:
+shape: (15, 3)
+┌──────────────────────┬───────────────┬───────┐
+│ feature              ┆ gain          ┆ split │
+│ ---                  ┆ ---           ┆ ---   │
+│ str                  ┆ f64           ┆ i64   │
+╞══════════════════════╪═══════════════╪═══════╡
+│ tower_score_pct      ┆ 1.0989e6      ┆ 1011  │
+│ tower_score_gap      ┆ 1.0398e6      ┆ 1043  │
+│ ipop_click_7_pct     ┆ 503415.252841 ┆ 955   │
+│ u_wid_last_days      ┆ 438838.020392 ┆ 585   │
+│ qpop_wid_click_7_pct ┆ 193897.343533 ┆ 845   │
+│ …                    ┆ …             ┆ …     │
+│ ipop_order_365_pct   ┆ 79523.374381  ┆ 897   │
+│ u_shop_id_last_days  ┆ 73721.252018  ┆ 500   │
+│ lex_bm25_pct         ┆ 57872.166181  ┆ 1208  │
+│ ua_gap_days          ┆ 56228.889473  ┆ 934   │
+│ ipop_users           ┆ 50259.071259  ┆ 773   │
+└──────────────────────┴───────────────┴───────┘
+
+=================== 06_predict.py 07:00:53
+07:01:13 ranker | 
+shape: (2, 9)
+┌──────────────────────────────┬────────┬────────┬────────┬───┬────────┬────────┬────────┬─────────┐
+│ model                        ┆ mrr    ┆ p1     ┆ ndcg10 ┆ … ┆ hr10   ┆ r10    ┆ r50    ┆ n_users │
+│ ---                          ┆ ---    ┆ ---    ┆ ---    ┆   ┆ ---    ┆ ---    ┆ ---    ┆ ---     │
+│ str                          ┆ f64    ┆ f64    ┆ f64    ┆   ┆ f64    ┆ f64    ┆ f64    ┆ i64     │
+╞══════════════════════════════╪════════╪════════╪════════╪═══╪════════╪════════╪════════╪═════════╡
+│ two-tower + LambdaRank [val] ┆ 0.4596 ┆ 0.3149 ┆ 0.4584 ┆ … ┆ 0.7612 ┆ 0.6407 ┆ 0.9243 ┆ 17172   │
+│ two-tower + LambdaRank       ┆ 0.461  ┆ 0.3165 ┆ 0.4607 ┆ … ┆ 0.7637 ┆ 0.6433 ┆ 0.9256 ┆ 17174   │
+│ [test]                       ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+└──────────────────────────────┴────────┴────────┴────────┴───┴────────┴────────┴────────┴─────────┘
+
+Test-set comparison (outputs/<scope>/results/summary_test.csv):
+shape: (15, 9)
+┌───────────────────────────────────────────────────────┬────────┬────────┬────────┬─────────┬────────┬────────┬────────┬─────────┐
+│ model                                                 ┆ mrr    ┆ p1     ┆ ndcg10 ┆ gndcg10 ┆ hr10   ┆ r10    ┆ r50    ┆ n_users │
+│ ---                                                   ┆ ---    ┆ ---    ┆ ---    ┆ ---     ┆ ---    ┆ ---    ┆ ---    ┆ ---     │
+│ str                                                   ┆ f64    ┆ f64    ┆ f64    ┆ f64     ┆ f64    ┆ f64    ┆ f64    ┆ i64     │
+╞═══════════════════════════════════════════════════════╪════════╪════════╪════════╪═════════╪════════╪════════╪════════╪═════════╡
+│ Random [test]                                         ┆ 0.1005 ┆ 0.0298 ┆ 0.085  ┆ 0.0833  ┆ 0.2266 ┆ 0.1599 ┆ 0.6081 ┆ 17174   │
+│ Popularity: users who interacted (all history) [test] ┆ 0.3435 ┆ 0.2012 ┆ 0.3525 ┆ 0.3479  ┆ 0.6526 ┆ 0.5403 ┆ 0.866  ┆ 17174   │
+│ Popularity: clicks, last 7 days [test]                ┆ 0.3311 ┆ 0.1915 ┆ 0.3386 ┆ 0.334   ┆ 0.6349 ┆ 0.5207 ┆ 0.8403 ┆ 17174   │
+│ Popularity: carts, last 90 days [test]                ┆ 0.3344 ┆ 0.1952 ┆ 0.3424 ┆ 0.3382  ┆ 0.6353 ┆ 0.5237 ┆ 0.8459 ┆ 17174   │
+│ Popularity: orders, last 365 days [test]              ┆ 0.2929 ┆ 0.1649 ┆ 0.2954 ┆ 0.2914  ┆ 0.5646 ┆ 0.4578 ┆ 0.7942 ┆ 17174   │
+│ …                                                     ┆ …      ┆ …      ┆ …      ┆ …       ┆ …      ┆ …      ┆ …      ┆ …       │
+│ Popularity + 0.0 x BM25 [test]                        ┆ 0.3311 ┆ 0.1915 ┆ 0.3386 ┆ 0.334   ┆ 0.6349 ┆ 0.5207 ┆ 0.8403 ┆ 17174   │
+│ Prior team Hybrid NCF+LSTM (fixed) [test]             ┆ 0.1708 ┆ 0.0734 ┆ 0.1644 ┆ 0.1619  ┆ 0.3706 ┆ 0.2851 ┆ 0.7288 ┆ 17174   │
+│ Prior team Hybrid NCF+LSTM (published) [test]         ┆ 0.135  ┆ 0.0597 ┆ 0.122  ┆ 0.1195  ┆ 0.2812 ┆ 0.2055 ┆ 0.5286 ┆ 17174   │
+│ two-tower [test]                                      ┆ 0.3576 ┆ 0.216  ┆ 0.3639 ┆ 0.3592  ┆ 0.6612 ┆ 0.5473 ┆ 0.8789 ┆ 17174   │
+│ two-tower + LambdaRank [test]                         ┆ 0.461  ┆ 0.3165 ┆ 0.4607 ┆ 0.4551  ┆ 0.7637 ┆ 0.6433 ┆ 0.9256 ┆ 17174   │
+└───────────────────────────────────────────────────────┴────────┴────────┴────────┴─────────┴────────┴────────┴────────┴─────────┘
+
+=================== 07_diagnostics.py 07:01:13
+07:01:24 diagnostics | tower attention by history segment: {'short': {'share_users_with_events': 0.876220703125, 'mean_attention_on_events_when_present': 0.6968376040458679}, 'mid': {'share_users_with_events': 0.930419921875, 'mean_attention_on_events_when_present': 0.031966984272003174}, 'long': {'share_users_with_events': 0.7880859375, 'mean_attention_on_events_when_present': 0.0009490251541137695}}
+07:01:25 diagnostics | segments:
+shape: (24, 6)
+┌───────────┬──────────────────────────┬────────────┬───────┬──────────┬──────────┐
+│ dimension ┆ segment                  ┆ model      ┆ n     ┆ mrr      ┆ gndcg10  │
+│ ---       ┆ ---                      ┆ ---        ┆ ---   ┆ ---      ┆ ---      │
+│ str       ┆ str                      ┆ str        ┆ u32   ┆ f64      ┆ f64      │
+╞═══════════╪══════════════════════════╪════════════╪═══════╪══════════╪══════════╡
+│ activity  ┆ clicked in last 7 days   ┆ popularity ┆ 14360 ┆ 0.340675 ┆ 0.345543 │
+│ activity  ┆ clicked in last 7 days   ┆ ranker     ┆ 14360 ┆ 0.465322 ┆ 0.458734 │
+│ activity  ┆ clicked in last 7 days   ┆ two-tower  ┆ 14360 ┆ 0.358158 ┆ 0.359807 │
+│ activity  ┆ no click in last 7 days  ┆ popularity ┆ 2814  ┆ 0.35797  ┆ 0.360199 │
+│ activity  ┆ no click in last 7 days  ┆ ranker     ┆ 2814  ┆ 0.438781 ┆ 0.436666 │
+│ …         ┆ …                        ┆ …          ┆ …     ┆ …        ┆ …        │
+│ query     ┆ query seen >= 10x        ┆ ranker     ┆ 2253  ┆ 0.513311 ┆ 0.51813  │
+│ query     ┆ query seen >= 10x        ┆ two-tower  ┆ 2253  ┆ 0.405085 ┆ 0.418187 │
+│ query     ┆ query unseen in training ┆ popularity ┆ 9689  ┆ 0.327368 ┆ 0.326551 │
+│ query     ┆ query unseen in training ┆ ranker     ┆ 9689  ┆ 0.437393 ┆ 0.42642  │
+│ query     ┆ query unseen in training ┆ two-tower  ┆ 9689  ┆ 0.338443 ┆ 0.335433 │
+└───────────┴──────────────────────────┴────────────┴───────┴──────────┴──────────┘
+07:02:47 diagnostics | SHAP by group:
+shape: (10, 2)
+┌─────────────────────────────────┬───────────────┐
+│ group                           ┆ mean_abs_shap │
+│ ---                             ┆ ---           │
+│ str                             ┆ f64           │
+╞═════════════════════════════════╪═══════════════╡
+│ slate context                   ┆ 0.758887      │
+│ impression CTR (out-of-fold)    ┆ 0.719175      │
+│ popularity (per type window)    ┆ 0.596805      │
+│ two-tower score                 ┆ 0.488101      │
+│ query -> item history (all use… ┆ 0.416272      │
+│ personal history (per type win… ┆ 0.265986      │
+│ lexical                         ┆ 0.229586      │
+│ user activity                   ┆ 0.09708       │
+│ item content                    ┆ 0.057715      │
+│ similar past queries            ┆ 0.00504       │
+└─────────────────────────────────┴───────────────┘
+07:02:47 diagnostics | 
+shape: (15, 9)
+┌──────────────────────────────┬────────┬────────┬────────┬───┬────────┬────────┬────────┬─────────┐
+│ model                        ┆ mrr    ┆ p1     ┆ ndcg10 ┆ … ┆ hr10   ┆ r10    ┆ r50    ┆ n_users │
+│ ---                          ┆ ---    ┆ ---    ┆ ---    ┆   ┆ ---    ┆ ---    ┆ ---    ┆ ---     │
+│ str                          ┆ f64    ┆ f64    ┆ f64    ┆   ┆ f64    ┆ f64    ┆ f64    ┆ i64     │
+╞══════════════════════════════╪════════╪════════╪════════╪═══╪════════╪════════╪════════╪═════════╡
+│ Random [test]                ┆ 0.1005 ┆ 0.0298 ┆ 0.085  ┆ … ┆ 0.2266 ┆ 0.1599 ┆ 0.6081 ┆ 17174   │
+│ Popularity: users who        ┆ 0.3435 ┆ 0.2012 ┆ 0.3525 ┆ … ┆ 0.6526 ┆ 0.5403 ┆ 0.866  ┆ 17174   │
+│ interact…                    ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Popularity: clicks, last 7   ┆ 0.3311 ┆ 0.1915 ┆ 0.3386 ┆ … ┆ 0.6349 ┆ 0.5207 ┆ 0.8403 ┆ 17174   │
+│ day…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Popularity: carts, last 90   ┆ 0.3344 ┆ 0.1952 ┆ 0.3424 ┆ … ┆ 0.6353 ┆ 0.5237 ┆ 0.8459 ┆ 17174   │
+│ day…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Popularity: orders, last 365 ┆ 0.2929 ┆ 0.1649 ┆ 0.2954 ┆ … ┆ 0.5646 ┆ 0.4578 ┆ 0.7942 ┆ 17174   │
+│ d…                           ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ …                            ┆ …      ┆ …      ┆ …      ┆ … ┆ …      ┆ …      ┆ …      ┆ …       │
+│ Popularity + 0.0 x BM25      ┆ 0.3311 ┆ 0.1915 ┆ 0.3386 ┆ … ┆ 0.6349 ┆ 0.5207 ┆ 0.8403 ┆ 17174   │
+│ [test]                       ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Prior team Hybrid NCF+LSTM   ┆ 0.1708 ┆ 0.0734 ┆ 0.1644 ┆ … ┆ 0.3706 ┆ 0.2851 ┆ 0.7288 ┆ 17174   │
+│ (fi…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ Prior team Hybrid NCF+LSTM   ┆ 0.135  ┆ 0.0597 ┆ 0.122  ┆ … ┆ 0.2812 ┆ 0.2055 ┆ 0.5286 ┆ 17174   │
+│ (pu…                         ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+│ two-tower [test]             ┆ 0.3576 ┆ 0.216  ┆ 0.3639 ┆ … ┆ 0.6612 ┆ 0.5473 ┆ 0.8789 ┆ 17174   │
+│ two-tower + LambdaRank       ┆ 0.461  ┆ 0.3165 ┆ 0.4607 ┆ … ┆ 0.7637 ┆ 0.6433 ┆ 0.9256 ┆ 17174   │
+│ [test]                       ┆        ┆        ┆        ┆   ┆        ┆        ┆        ┆         │
+└──────────────────────────────┴────────┴────────┴────────┴───┴────────┴────────┴────────┴─────────┘
+
+done. results in outputs/<scope>/results (summary_test.csv), figures in outputs/<scope>/figures
