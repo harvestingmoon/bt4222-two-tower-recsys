@@ -1,7 +1,7 @@
 """Stage 7: diagnostics of the final model -> results/diag_* and figures/diag_*
 
-    python scripts/07_diagnostics.py                                  # segments, shap, attention
-    python scripts/07_diagnostics.py --parts segments,shap,attention,ablations
+    python scripts/07_diagnostics.py                                  # segments, insights, shap, attention
+    python scripts/07_diagnostics.py --parts segments,insights,shap,attention,ablations
 Tower ablations are trained separately (optional):
     python scripts/03_train_tower.py --variant no_history && python scripts/04_score_tower.py --variant no_history
 """
@@ -15,7 +15,7 @@ from jds.config import cli  # noqa: E402
 
 
 def extra(p):
-    p.add_argument("--parts", default="segments,shap,attention", help="comma-separated: segments,shap,attention,ablations")
+    p.add_argument("--parts", default="segments,insights,shap,attention", help="comma-separated: segments,insights,shap,attention,ablations")
 
 
 if __name__ == "__main__":

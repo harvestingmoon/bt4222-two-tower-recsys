@@ -11,12 +11,14 @@ The pipeline replaces the previous team's Hybrid NCF + LSTM with:
    scored by cosine similarity;
 2. a **LightGBM LambdaRank re-ranker** that combines the tower score with ~100 hand-crafted features.
 
-Everything runs from the command line (`scripts/`); the two notebooks are thin wrappers.
+Everything runs from the command line (`scripts/`) or, stage by stage, from the notebooks in `notebooks/`
+(`step1_…` to `step7_…`), which run on Google Colab with a GPU and keep their outputs.
 
 ---
 
 ## Contents
 
+- [Run on Google Colab](#run-on-google-colab)
 - [Quick start](#quick-start)
 - [How the pipeline works](#how-the-pipeline-works)
 - [Design decisions](#design-decisions)
@@ -27,13 +29,37 @@ Everything runs from the command line (`scripts/`); the two notebooks are thin w
 
 ---
 
+## Run on Google Colab
+
+1. Put the two raw files in your Google Drive under `MyDrive/bt4222/raw/` (see [data/raw/README.md](data/raw/README.md)).
+2. Open the notebooks in order from GitHub in Colab (*File → Open notebook → GitHub*, repository
+   `clarequek/bt4222-two-tower-recsys`) and set *Runtime → Change runtime type → GPU*.
+3. Run each notebook top to bottom. Its first cell mounts Drive, clones the repository, installs the requirements and
+   writes all outputs to `MyDrive/bt4222/outputs/`, so later notebooks (and later sessions) reuse earlier results.
+
+| notebook | stages | runtime |
+|---|---|---|
+| `step1_data_preprocess_eda.ipynb` | parse, leakage fix, split; EDA incl. funnel by elapsed days | CPU |
+| `step2_features_baselines.ipynb` | ~105 features; non-learned baselines | CPU, ~6 GB RAM |
+| `step3_prior_baseline_ncf.ipynb` | previous team's Hybrid NCF + LSTM and its gap diagnosis | GPU |
+| `step4_window_ablation.ipynb` | same ranker on windowed vs naive history features | CPU |
+| `step5_two_tower.ipynb` | cross-fitted two-tower training and scoring (+ optional ablations) | GPU |
+| `step6_ranker_results.ipynb` | LambdaRank re-ranker; final train / val / test tables | CPU, ~15 GB RAM |
+| `step7_diagnostics.ipynb` | segments, insights, SHAP, attention, feature-group ablations | CPU/GPU |
+
+Cells that print reported metrics are marked with an orange **★ PERFORMANCE OUTPUT** banner and the best value in each
+metric column is highlighted. On a standard (12 GB RAM) Colab runtime pass `"--set", "ranker.train_user_frac=0.5"` in
+step 6. Set `CONFIG = "configs/smoke.yaml"` in the first cell for a quick check on 2,000 users.
+
+---
+
 ## Quick start
 
 **Needs:** Linux with an NVIDIA GPU (≥ 16 GB VRAM recommended, see [Troubleshooting](#troubleshooting) for smaller GPUs),
 ≥ 32 GB RAM, ~20 GB free disk, Python 3.11 or 3.12. The scripts also run on CPU / Apple Silicon (slowly for the tower).
 
 ```bash
-git clone https://github.com/yushanedi/bt4222-two-tower-recsys.git
+git clone https://github.com/clarequek/bt4222-two-tower-recsys.git
 cd bt4222-two-tower-recsys
 python3 -m venv .venv
 source .venv/bin/activate
@@ -82,8 +108,8 @@ bash scripts/run_all.sh configs/default.yaml 2>&1 | tee run_full.log
 Every stage skips work whose outputs already exist, so after a crash just re-run the same command. To redo a single
 stage add `--force` to that script, e.g. `python scripts/05_train_ranker.py --force`.
 
-**3. Results.** The final comparison table is `outputs/full/results/summary_test.csv`; open
-`notebooks/02_results.ipynb` for tables and figures. To share results, send back `outputs/full/results/`,
+**3. Results.** The final comparison table is `outputs/full/results/summary_test.csv` (training / validation / test side by side:
+`summary_all_splits.csv`); the step notebooks show every table and figure. To share results, send back `outputs/full/results/`,
 `outputs/full/figures/`, `outputs/full/tower/*_history.json` and `run_full.log` (all small); model files and parquet
 tables are large and can be regenerated.
 
@@ -94,16 +120,17 @@ tables are large and can be regenerated.
 ```mermaid
 flowchart TD
     R[("raw files<br/>user_behavior_data.txt<br/>product_meta_data.txt")] --> P["00 prepare<br/>parse, shuffle slates,<br/>split users, folds"]
-    P --> E["01 EDA<br/>retention windows,<br/>type mix by age"]
+    P --> E["01 EDA<br/>retention windows,<br/>funnel by elapsed days,<br/>slates"]
     P --> F["02 features<br/>~105 per (user, item)"]
     F --> B["02b baselines<br/>popularity, CTR, BM25"]
-    P --> N["02c prior team's<br/>Hybrid NCF + LSTM"]
+    P --> N["02c prior team's<br/>Hybrid NCF + LSTM<br/>+ gap diagnosis"]
+    F --> W["02d window ablation<br/>windowed vs naive<br/>history features"]
     P --> T["03 train two-tower<br/>fold0, fold1 (cross-fit)<br/>+ full"]
     T --> S["04 score tower<br/>out-of-fold for train users,<br/>full model for val / test"]
     F --> K["05 train LambdaRank<br/>train users, early stop on val"]
     S --> K
     K --> X["06 predict<br/>val + test slates"]
-    X --> D["07 diagnostics<br/>segments, SHAP,<br/>attention, ablations"]
+    X --> D["07 diagnostics<br/>segments, insights, SHAP,<br/>attention, ablations"]
     B --> X
     N --> X
 ```
@@ -140,7 +167,9 @@ Counted back from each user's test query, **clicks are kept only for 7 days, car
   `order_7`, `order_90`, `order_365`, `follow_90`) plus *days since the last event*; no mixing of types with decay
   weights, no "click ratio" (it is 95% correlated with how much of a user's history falls in the last week);
 - the tower splits the history into three segments, **short (< 7 d, all types), mid (7–90 d, carts/follows/orders),
-  long (≥ 90 d, orders only)**, each pooled by its own query-guided attention.
+  long (≥ 90 d, orders only)**, each pooled by its own query-guided attention;
+- `02d_window_ablation.py` tests the choice: the same ranker trained on windowed vs naive (all-history, decayed,
+  ratio) history features.
 
 ---
 
@@ -194,15 +223,16 @@ All outputs go to `outputs/<scope>/` (`full`, or `sample_<N>` for a user subsamp
 | script | does | main outputs | time (measured on a 16 GB Apple M-series laptop, CPU) |
 |---|---|---|---|
 | `00_prepare.py` | parse raw files, shuffle slates, split users, folds; subsample for `sample_*` scopes | `data/*.parquet`, `results/prepare_stats.json` | 1 min |
-| `01_eda.py` | retention windows, type mix by age, slate stats, popularity AUC by window | `figures/history_timeline.png`, `results/eda.json` | 10 s |
+| `01_eda.py` | retention windows, type mix by age, funnel by elapsed days, history without possible clicks, slate stats, popularity AUC by window | `figures/history_timeline.png`, `figures/funnel_by_age.png`, `results/eda.json`, `results/eda_funnel_by_age.csv` | 10 s |
 | `02_features.py` | ~105 features per displayed item, in 20k-user chunks | `features/part_*.parquet` (15.5 M rows) | 17 min, 6 GB RAM peak |
 | `02b_baselines.py` | non-learned baselines | `results/baselines.json` | 5 s |
-| `02c_prior_ncf.py` | previous team's model (2 variants × 3 epochs) | `results/prior_ncf.json` | GPU: est. 10–20 min |
+| `02c_prior_ncf.py` | previous team's model (2 variants × 3 epochs) + measured structural gaps | `results/prior_ncf.json`, `results/prior_ncf_gaps.json` | GPU: est. 10–20 min |
+| `02d_window_ablation.py` | 4 rankers on 30% of training users: windowed vs naive history features | `results/window_ablation*.csv`, `figures/window_ablation.png` | CPU: est. 20–40 min |
 | `03_train_tower.py` | 3 towers (`fold0`, `fold1`, `full`) × 3 epochs ≈ 13k steps; first builds the item matrix (12.3 M items, ~2 min) | `tower/assets.npz`, `tower/*.pt`, `tower/*_history.json` | GPU: est. 30–90 min (not measured; 1.7 s/step on laptop CPU) |
 | `04_score_tower.py` | cross-fitted scores for all 15.5 M displayed items | `tower/tower_scores.parquet`, `results/tower.json` | GPU: est. 5–10 min |
 | `05_train_ranker.py` | LambdaRank on ~137k training slates | `ranker/ranker.txt`, `results/ranker_feature_importance.csv` | CPU: est. 10–30 min, ~15 GB RAM |
-| `06_predict.py` | re-rank val/test, final table | `predictions/ranker_{val,test}.parquet`, `results/ranker.json`, `results/summary_test.csv` | ~1 min |
-| `07_diagnostics.py` | segments, SHAP, tower attention (+ `--parts ablations`: 11 rankers on 30% of users) | `results/diag_*`, `figures/diag_shap.png` | ~5 min (+ ~1 h with ablations) |
+| `06_predict.py` | re-rank val/test (+ 25% of training users for training performance), final tables | `predictions/ranker_{val,test}.parquet`, `results/ranker.json`, `results/summary_test.csv`, `results/summary_all_splits.csv` | ~2 min |
+| `07_diagnostics.py` | segments, behavioural insights, SHAP, tower attention (+ `--parts ablations`: 11 rankers on 30% of users) | `results/diag_*`, `figures/diag_segments.png`, `figures/diag_shap.png` | ~5 min (+ ~1 h with ablations) |
 
 Measured sanity check at full scale (CPU, no tower): a features-only ranker trained on 25% of the training users
 reaches test MRR 0.455 / NDCG@10 0.454, against 0.344 / 0.353 for the best non-learned baseline
@@ -241,19 +271,21 @@ bash scripts/run_all.sh configs/default.yaml --set scope=sample_30000
 ```
 configs/            default.yaml (full run), smoke.yaml (CPU check)
 data/raw/           the two raw files go here (git-ignored)
-scripts/            00_prepare … 07_diagnostics, run_all.sh, smoke_test.sh
+scripts/            00_prepare … 07_diagnostics (incl. 02d_window_ablation), run_all.sh, smoke_test.sh
 src/jds/
   config.py         config loading (--config / --set), paths, seeding, device, logging
   prepare.py        stage 0
   windows.py        retention windows, windowed counts, history segments
   features.py       feature table, out-of-fold CTR
   baselines.py      non-learned baselines
-  prior_ncf.py      previous team's Hybrid NCF + LSTM
+  prior_ncf.py      previous team's Hybrid NCF + LSTM + gap diagnosis
+  window_ablation.py  windowed vs naive history features (stage 2d)
+  notebook.py       helpers for the step notebooks (run a stage, highlighted tables)
   twotower/         data.py (vocabularies, item matrix, batches), model.py, train.py (cross-fitting), infer.py
   ranker/           dataset.py, train.py, infer.py
   metrics.py        MRR, P@1, NDCG@10, graded NDCG@10, HR@10, recall@k
   eda.py, diagnostics.py
-notebooks/          01_run_pipeline.ipynb (runs the scripts), 02_results.ipynb (reads results)
+notebooks/          step1_data_preprocess_eda … step7_diagnostics (Colab-ready, one per stage)
 tests/              unit tests on a synthetic raw dataset (run by smoke_test.sh)
 outputs/            everything produced (git-ignored)
 ```
@@ -270,6 +302,8 @@ outputs/            everything produced (git-ignored)
   so a half-written data folder is never reused.
 - **Different numbers between runs.** Data preparation, splits and folds are deterministic (seed 42). GPU training is
   not bit-for-bit deterministic, so tower metrics can move in the third decimal.
+- **macOS: `Library not loaded: @rpath/libomp.dylib` when importing LightGBM.** Run `brew install libomp`, or point
+  LightGBM at the copy bundled with PyTorch: `export DYLD_LIBRARY_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")/lib`.
 - **macOS hangs at 0% CPU** when PyTorch and LightGBM share a process: `07_diagnostics.py` already runs the PyTorch part
   first with one thread; if it still happens, run `--parts attention` and `--parts segments,shap` separately.
 - **Old GPU without bfloat16 (e.g. T4, V100).** Handled automatically: AMP falls back to float16 with a gradient scaler.

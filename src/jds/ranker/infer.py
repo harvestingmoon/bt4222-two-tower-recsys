@@ -9,8 +9,9 @@ from ..metrics import evaluate, per_user_metrics, results_table
 from . import dataset
 
 
-def predict(cfg: dict, p, booster: lgb.Booster, names: list[str], split: str, use_tower: bool = True) -> pl.DataFrame:
-    df = dataset.load(p, [split], cfg, use_tower)
+def predict(cfg: dict, p, booster: lgb.Booster, names: list[str], split: str, use_tower: bool = True,
+            user_frac: float = 1.0) -> pl.DataFrame:
+    df = dataset.load(p, [split], cfg, use_tower, user_frac=user_frac)
     return df.select("user_id", "wid", "label").with_columns(
         score=pl.Series(booster.predict(df.select(names).to_numpy(), num_threads=0)).cast(pl.Float32))
 
@@ -30,6 +31,10 @@ def run(cfg: dict) -> pl.DataFrame:
         rows.append(evaluate(pred, "score", seed=cfg["seed"], name=f"two-tower + LambdaRank [{split}]"))
         if split == "test":
             per_user_metrics(pred, "score", seed=cfg["seed"]).write_parquet(p.results / "per_user_ranker_test.parquet")
+    # training performance (out-of-fold tower scores and CTR, so comparable with val / test; a user subsample bounds RAM)
+    frac = cfg["ranker"].get("train_eval_user_frac", 0.25)
+    pred = predict(cfg, p, booster, names, "train", user_frac=frac)
+    rows.insert(0, evaluate(pred, "score", seed=cfg["seed"], name=f"two-tower + LambdaRank [train, {frac:.0%} of users]"))
     save_json(rows, p.results / "ranker.json")
     log.info("\n" + str(results_table(rows)))
     return results_table(rows)
@@ -38,11 +43,14 @@ def run(cfg: dict) -> pl.DataFrame:
 def summary(cfg: dict) -> pl.DataFrame:
     """Every model's test metrics in one table (baselines, prior team's model, tower, ranker)."""
     p = paths(cfg)
-    rows = []
+    rows, every = [], []
     for name in ("baselines.json", "prior_ncf.json", "tower.json", "ranker.json"):
         f = p.results / name
         if f.exists():
+            every += load_json(f)
             rows += [r for r in load_json(f) if "[test]" in r["model"]]
+    if every:   # training / validation / test side by side (report Section 2)
+        results_table(every).write_csv(p.results / "summary_all_splits.csv")
     if not rows:
         return pl.DataFrame()
     tbl = results_table(rows)

@@ -63,6 +63,7 @@ ranker:
   early_stopping_rounds: 100
   label_gain: [0, 1, 3, 7]   # graded gain 2^label - 1 for labels 0..3
   train_user_frac: 1.0       # subsample training users for faster experiments
+  train_eval_user_frac: 0.25 # share of training users scored to report training performance
   params:
     objective: lambdarank
     metric: ndcg

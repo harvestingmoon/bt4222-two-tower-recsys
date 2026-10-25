@@ -183,24 +183,31 @@ def run(cfg: dict, force: bool = False) -> pl.DataFrame:
     return tbl
 
 
+SEG_ORDER = ["< 50% of history older than 7 d", "50-90% older than 7 d", ">= 90% older than 7 d"]
+SEG_SHORT = {"< 50% of history older than 7 d": "< 50% older\nthan 7 d", "50-90% older than 7 d": "50-90% older\nthan 7 d",
+             ">= 90% older than 7 d": ">= 90% older\nthan 7 d"}
+
+
 def _plot(tbl: pl.DataFrame, segs: pl.DataFrame, path, frac) -> None:
-    fig, ax = plt.subplots(1, 2, figsize=(13, 4.2))
+    fig, ax = plt.subplots(1, 2, figsize=(14, 4.6), gridspec_kw={"width_ratios": [1, 1.1]})
     models = tbl["model"].to_list()
     colors = ["#4C72B0", "#DD8452", "#55A868", "#8C8C8C"]
     ax[0].barh(models[::-1], tbl["gndcg10"].to_numpy()[::-1], color=colors[: len(models)][::-1])
     for i, v in enumerate(tbl["gndcg10"].to_numpy()[::-1]):
         ax[0].text(v, i, f" {v:.4f}", va="center", fontsize=8)
-    ax[0].set(xlabel="graded NDCG@10 (test)", title=f"Same ranker, different history features ({frac:.0%} of training users)")
-    seg_names = sorted(segs["segment"].unique().to_list())
+    ax[0].set(xlabel="graded NDCG@10 (test users)", title=f"Same ranker, different history features\n(trained on {frac:.0%} of training users)")
+    present = set(segs["segment"].unique().to_list())
+    seg_names = [s_ for s_ in SEG_ORDER if s_ in present]
     x = np.arange(len(seg_names))
     w = 0.8 / len(models)
     for j, m in enumerate(models):
         d = segs.filter(pl.col("model") == m)
-        v = [d.filter(pl.col("segment") == s)["gndcg10"].mean() or 0 for s in seg_names]
+        v = [d.filter(pl.col("segment") == s_)["gndcg10"].mean() or 0 for s_ in seg_names]
         ax[1].bar(x + j * w, v, w, color=colors[j % len(colors)], label=m)
-    ax[1].set_xticks(x + w * (len(models) - 1) / 2, seg_names, fontsize=8)
-    ax[1].set(ylabel="graded NDCG@10 (test)", title="By share of the user's history older than the click window")
-    ax[1].legend(fontsize=7)
+    n = [int(segs.filter(pl.col("segment") == s_)["n"].max()) for s_ in seg_names]
+    ax[1].set_xticks(x + w * (len(models) - 1) / 2, [f"{SEG_SHORT[s_]}\n(n={k:,})" for s_, k in zip(seg_names, n)], fontsize=8)
+    ax[1].set(ylabel="graded NDCG@10 (test users)", title="By share of the user's history older than the 7-day click window")
+    ax[1].legend(fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.22), ncol=2, frameon=False)
     fig.tight_layout()
-    fig.savefig(path, dpi=150)
+    fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
