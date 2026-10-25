@@ -152,6 +152,29 @@ def run(cfg: dict) -> pl.DataFrame:
     samp = {s: group_lists(sampled.join(u, on="user_id", how="semi")) for s, u in split_users.items()}
     full_test = group_lists(cands.join(split_users["test"], on="user_id", how="semi"))
 
+    # ---- gap diagnosis: structural reasons this model cannot do well on the task (results/prior_ncf_gaps.json)
+    ft = full_test
+    pos = ft["label"] > 0
+    attr_pub, attr_fix = lookups[:, torch.from_numpy(ft["published"])].numpy(), lookups[:, torch.from_numpy(ft["fixed"])].numpy()
+    has_meta = ft["fixed"] > 0
+    wrong = (attr_pub != attr_fix).any(0)
+    gaps = {
+        "uses_test_query": False,
+        "displayed_items_without_item_embedding (cold, not in history >= min_item_count)": float((ft["hidx"] == 0).mean()),
+        "positives_without_item_embedding": float((ft["hidx"][pos] == 0).mean()),
+        "published_variant_wrong_attributes_share (items with metadata)": float(wrong[has_meta].mean()) if has_meta.any() else None,
+        "published_variant_wrong_attributes_share_positives": float(wrong[has_meta & pos].mean()) if (has_meta & pos).any() else None,
+        "train_items_per_list_sampled": float(np.bincount(np.unique(samp["train"]["user_id"], return_inverse=True)[1]).mean()),
+        "test_items_per_slate_full": float(np.bincount(np.unique(ft["user_id"], return_inverse=True)[1]).mean()),
+        "history_truncated_to_last_events": L,
+        "users_with_history_longer_than_maxlen": float((users["hist_len"].to_numpy() > L).mean()),
+        "users_with_history": int((lengths > 0).sum()),
+        "user_meta_features": meta_cols,
+        "note": "click/cart/order ratios over the whole history mix retention windows (see eda.json recency_confound)",
+    }
+    save_json(gaps, p.results / "prior_ncf_gaps.json")
+    log.info(f"prior model gap diagnosis: {gaps}")
+
     def batches(data, variant, bs, shuffle=False):
         uids = np.unique(data["user_id"])
         starts = np.searchsorted(data["user_id"], uids)

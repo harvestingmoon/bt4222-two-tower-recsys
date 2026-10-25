@@ -22,6 +22,7 @@ run 01_eda.py           ${ARGS[@]+"${ARGS[@]}"}
 run 02_features.py      ${ARGS[@]+"${ARGS[@]}"}
 run 02b_baselines.py    ${ARGS[@]+"${ARGS[@]}"}
 run 02c_prior_ncf.py    ${ARGS[@]+"${ARGS[@]}"}
+run 02d_window_ablation.py ${ARGS[@]+"${ARGS[@]}"}
 run 03_train_tower.py   ${ARGS[@]+"${ARGS[@]}"}
 run 04_score_tower.py   ${ARGS[@]+"${ARGS[@]}"}
 run 05_train_ranker.py  ${ARGS[@]+"${ARGS[@]}"}

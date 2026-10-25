@@ -24,8 +24,17 @@ def fit(cfg: dict, p, names: list[str], use_tower: bool = True, user_frac: float
     t0 = time.time()
     tr = dataset.load(p, ["train"], cfg, use_tower, user_frac=frac, only_with_pos=True)
     va = dataset.load(p, ["val"], cfg, use_tower, only_with_pos=True)
+    log.info(f"[{tag}] loaded in {time.time()-t0:.0f}s")
+    return fit_frames(cfg, tr, va, names, tag=tag, log=log)
+
+
+def fit_frames(cfg: dict, tr: pl.DataFrame, va: pl.DataFrame, names: list[str], tag: str = "ranker", log=None) -> lgb.Booster:
+    """LambdaRank on already-loaded training / validation rows (sorted by user, positives-only slates)."""
+    rc = cfg["ranker"]
+    log = log or get_logger("ranker")
+    t0 = time.time()
     log.info(f"[{tag}] train {tr['user_id'].n_unique():,} slates / {tr.height:,} rows, val {va['user_id'].n_unique():,} slates, "
-             f"{len(names)} features ({time.time()-t0:.0f}s)")
+             f"{len(names)} features")
     params = {**rc["params"], "label_gain": rc["label_gain"], "seed": cfg["seed"], "deterministic": True,
               "force_row_wise": True}
     dtr = lgb.Dataset(tr.select(names).to_numpy(), tr["label"].to_numpy(), group=dataset.groups(tr), feature_name=names,
