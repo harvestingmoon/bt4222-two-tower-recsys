@@ -94,7 +94,7 @@ class QueryUserTower(nn.Module):
     def forward(self, q_terms: torch.Tensor, ctx: dict, item_feats, cand: torch.Tensor,
                 cand_rows: torch.Tensor | None = None, cand_v: torch.Tensor | None = None) -> torch.Tensor:
         """q_terms [B,Tq]; cand [B,S] item row indices.
-        ctx[segment] = {item [B,L], type, time, query [B,L,Tq], mask [B,L], count [B], tcount [B,4]}.
+        ctx[segment] = {item [B,L], type, time, query [B,L,Tq], mask [B,L], count [B], tcount [B,5] (4 type counts + log size)}.
         Returns [B,S,D] — one user vector per candidate."""
         q = self.encode_query(q_terms)
         if not self.use_query:
@@ -112,7 +112,7 @@ class QueryUserTower(nn.Module):
             pooled = self.attn(cand_v, q, h, c["mask"])                # [B,S,D]
         else:
             pooled = torch.zeros_like(cand_v)
-        counts = torch.cat([ctx[s]["tcount"] for s in SEGMENTS], -1).to(q.dtype)   # [B, 4*3]
+        counts = torch.cat([ctx[s]["tcount"] for s in SEGMENTS], -1).to(q.dtype)   # [B, 5*3]
         flags = self.match_flags(cand_rows, cand, hist_rows, ctx)      # [B,S,N_FLAGS]
         if not self.use_history:
             counts, flags = torch.zeros_like(counts), torch.zeros_like(flags)
