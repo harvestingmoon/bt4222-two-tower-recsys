@@ -28,6 +28,8 @@ C_POP0 = C_ID0 + len(ID_COLS)
 N_FEAT = C_POP0 + len(POP_COLS)
 N_POP_BUCKETS = 18                       # 0 = pad, 1 = never, 2..17 = log2 buckets
 N_TIME_BUCKETS = 24                      # 0 = pad, 1..23 = log2(seconds) buckets
+N_TYPES = 4                              # CLICK, FLW, CART, ORD
+N_COUNTS = N_TYPES + 1                   # per-type counts + the true log size, per segment
 SEGMENTS = ("short", "mid", "long")
 TYPE_WEIGHT = np.array([0.0, 1.0, 1.0, 2.0, 3.0], np.float32)   # auxiliary loss weight by type code (CLICK, FLW, CART, ORD)
 
@@ -65,11 +67,12 @@ class TermVocab:
 
 
 class IdVocab:
-    """Ids seen at least `min_count` times get an index; rare / unseen ids map to 0."""
+    """Ids seen at least `min_count` times get an index; rare / unseen ids hash into `buckets` slots (or map to 0)."""
 
-    def __init__(self, values_sorted: np.ndarray):
+    def __init__(self, values_sorted: np.ndarray, buckets: int = 0):
         self.values = np.asarray(values_sorted, dtype=np.int64)
-        self.size = len(self.values) + 1
+        self.buckets = int(buckets)
+        self.size = len(self.values) + 1 + self.buckets
 
     def map(self, a: np.ndarray) -> np.ndarray:
         out = np.zeros(a.shape, dtype=np.int32)
@@ -78,7 +81,10 @@ class IdVocab:
         m = a >= 0
         v = a[m].astype(np.int64)
         pos = np.minimum(np.searchsorted(self.values, v), len(self.values) - 1)
-        out[m] = np.where(self.values[pos] == v, pos + 1, 0)
+        found = self.values[pos] == v
+        # Long-tail ids still carry a little signal, so hash them into shared buckets instead of one dead index.
+        out[m] = np.where(found, pos + 1, len(self.values) + 1 + (v % self.buckets)) if self.buckets \
+            else np.where(found, pos + 1, 0)
         return out
 
 
@@ -97,7 +103,7 @@ def build_id_vocabs(products: pl.LazyFrame, min_count: int = 2) -> dict:
     out = {}
     for c in ID_COLS:
         vc = products.select(c).drop_nulls().group_by(c).len().filter(pl.col("len") >= min_count).collect()
-        out[c] = IdVocab(np.sort(vc[c].to_numpy()))
+        out[c] = IdVocab(np.sort(vc[c].to_numpy()), buckets=2048 if c in ("brand_id", "shop_id") else 0)
     return out
 
 
@@ -204,6 +210,7 @@ class Stores:
             idx = hi[:, None] - L + np.arange(L)[None]
             mask = idx >= lo[:, None]
             idx = np.where(mask, idx, 0)
+            t = np.where(mask, self.h_type[idx], 0)
             out[seg] = {
                 "item": np.where(mask, self.h_item[idx], 0),
                 "type": np.where(mask, self.h_type[idx], 0),
@@ -211,6 +218,9 @@ class Stores:
                 "query": self.qterms[np.where(mask, self.h_qid[idx], -1)],      # -1 -> empty query row
                 "mask": mask,
                 "count": np.log1p(hi - lo).astype(np.float32),
+                # shortcut: per-type counts are capped at seg_len; the exact total rides along as the last column.
+                "tcount": np.concatenate([np.stack([(t == k).sum(1) for k in range(1, N_TYPES + 1)], -1),
+                                          np.log1p(hi - lo)[:, None]], -1).astype(np.float32),
             }
         return out
 
@@ -224,11 +234,21 @@ class Stores:
         users = np.asarray(users, np.int64)
         return self.user_batch(users), self.s_item[users], self.s_label[users]
 
-    def pair_batch(self, ev: np.ndarray) -> tuple[dict, np.ndarray, np.ndarray]:
+    def pair_batch(self, ev: np.ndarray) -> tuple[dict, np.ndarray, np.ndarray, np.ndarray]:
         """Auxiliary pairs: (query of the event, the history before it) -> item of the event, with type weight."""
         u = self.h_user[ev]
         b = {"q": self.qterms[self.h_qid[ev]], "ctx": self.context(u, ev, self.h_age[ev])}
-        return b, self.h_item[ev], TYPE_WEIGHT[self.h_type[ev]]
+        return b, self.h_item[ev], TYPE_WEIGHT[self.h_type[ev]], u
+
+    def neg_batch(self, users: np.ndarray, pos: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
+        """Up to k items from each anchor's own slate as hard negatives, excluding the positive.
+
+        These are the products the user was actually shown and passed over, which is a far harder negative than
+        another anchor's positive. Returns (row indices [B,k], validity mask [B,k])."""
+        sl = self.s_item[np.asarray(users, np.int64)]
+        keep = (sl > 0) & (sl != np.asarray(pos)[:, None])
+        order = np.argsort(~keep, axis=1, kind="stable")[:, :k]
+        return np.take_along_axis(sl, order, 1), np.take_along_axis(keep, order, 1)
 
     def aux_events(self, max_age: float) -> np.ndarray:
         """Query-tagged history events inside the click window: anchors whose earlier history is fully recorded."""

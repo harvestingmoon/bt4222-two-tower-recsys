@@ -22,7 +22,7 @@ import torch.nn.functional as F
 from ..config import get_device, get_logger, load_json, paths, save_json, set_seed
 from ..metrics import evaluate
 from ..prepare import load
-from .data import ID_COLS, Stores, TermVocab, build_id_vocabs, build_item_matrix, build_term_vocab, item_popularity, query_matrix
+from .data import C_NAME, ID_COLS, Stores, TermVocab, build_id_vocabs, build_item_matrix, build_term_vocab, item_popularity, query_matrix
 from .model import TwoTower
 
 
@@ -80,6 +80,15 @@ class ItemFeats:
         return self.X[idx.to(self.X.device)].to(self.device, non_blocking=True)
 
 
+def word_drop(x: torch.Tensor, p: float) -> torch.Tensor:
+    """Hide a share of an item's title terms, so the tower cannot lean on one distinctive word."""
+    if p <= 0:
+        return x
+    out = x.clone()
+    out[..., C_NAME] = x[..., C_NAME] * (torch.rand(x[..., C_NAME].shape, device=x.device) >= p)
+    return out
+
+
 def autocast(device: str, enabled: bool):
     if enabled and device == "cuda":
         dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -93,8 +102,9 @@ def fp32(t: torch.Tensor):
 
 
 def slate_scores(u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+    """Cosine between each candidate's own user vector and that candidate's item vector; [B,S]."""
     with fp32(u):
-        return torch.einsum("bd,bsd->bs", u.float(), v.float())
+        return torch.einsum("bsd,bsd->bs", u.float(), v.float())
 
 
 def listwise_loss(scores: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
@@ -108,13 +118,30 @@ def listwise_loss(scores: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
     return loss[has_pos].mean() if has_pos.any() else scores.sum() * 0.0
 
 
-def inbatch_loss(u: torch.Tensor, v: torch.Tensor, item_idx: torch.Tensor, w: torch.Tensor, scale) -> torch.Tensor:
-    """In-batch softmax; other rows holding the same item are not treated as negatives."""
+def inbatch_loss(u: torch.Tensor, v: torch.Tensor, item_idx: torch.Tensor, w: torch.Tensor, scale,
+                 neg_v: torch.Tensor | None = None, neg_idx: torch.Tensor | None = None,
+                 neg_mask: torch.Tensor | None = None, logq_ib: torch.Tensor | None = None,
+                 logq_neg: torch.Tensor | None = None) -> torch.Tensor:
+    """Sampled softmax on auxiliary anchors, widened with each anchor's own slate as hard negatives.
+
+    Other rows holding the same item are not negatives. `logq_*` subtracts the popularity term, the sampled-softmax
+    bias correction: without it the loss mostly rewards items because they are common, not because the query fits.
+    """
+    n = len(u)
     with fp32(u):
         logits = scale * (u.float() @ v.float().T)
-    same = (item_idx[:, None] == item_idx[None, :]) & ~torch.eye(len(item_idx), dtype=torch.bool, device=u.device)
+        if logq_ib is not None:
+            logits = logits - logq_ib[None, :]
+    same = (item_idx[:, None] == item_idx[None, :]) & ~torch.eye(n, dtype=torch.bool, device=u.device)
     logits = logits.masked_fill(same, -1e4)
-    ce = F.cross_entropy(logits, torch.arange(len(u), device=u.device), reduction="none")
+    if neg_v is not None:
+        with fp32(u):
+            ln = scale * torch.einsum("bd,bkd->bk", u.float(), neg_v.float())
+            if logq_neg is not None:
+                ln = ln - logq_neg
+        ln = ln.masked_fill(~neg_mask | (neg_idx == item_idx[:, None]), -1e4)
+        logits = torch.cat([logits, ln], 1)
+    ce = F.cross_entropy(logits, torch.arange(n, device=u.device), reduction="none")
     return (ce * w).sum() / w.sum().clamp(min=1e-9)
 
 
@@ -129,9 +156,11 @@ def score_users(model: TwoTower, st: Stores, feats: ItemFeats, users: np.ndarray
         b, items, labels = st.slate_batch(ub)
         with autocast(device, cfg["tower"]["amp"]):
             bd = to_dev(b, device)
-            u = model.user_vec(bd["q"], bd["ctx"], feats)
             it = torch.as_tensor(items, device=device)
-            v = model.item_vec(feats(it))
+            rows = feats(it)
+            cand_v = model.item(rows)
+            v = F.normalize(cand_v.float(), dim=-1)
+            u = model.user_vec(bd["q"], bd["ctx"], feats, it, cand_rows=rows, cand_v=cand_v)
             sc = slate_scores(u, v).cpu().numpy()
         m = labels >= 0
         out_u.append(np.repeat(ub, m.sum(1))); out_w.append(st.s_wid[ub][m]); out_l.append(labels[m]); out_s.append(sc[m])
@@ -146,18 +175,34 @@ def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Sto
     set_seed(cfg["seed"])
     rng = np.random.default_rng(cfg["seed"])
     model = TwoTower(a["n_terms"], [int(x) for x in a["id_sizes"]], tc, use_history, use_query).to(device)
-    feats = ItemFeats(a["X"], device, tc["item_matrix_on_gpu"] and device == "cuda")
+    base = ItemFeats(a["X"], device, tc["item_matrix_on_gpu"] and device == "cuda")
+    p_wd = float(tc.get("word_dropout", 0.0))
+    feats = (lambda idx: word_drop(base(idx), p_wd)) if p_wd > 0 else base   # train only; validation uses `base`
     opt = torch.optim.AdamW(model.parameters(), lr=tc["lr"], weight_decay=tc["weight_decay"])
     use_scaler = tc["amp"] and device == "cuda" and not torch.cuda.is_bf16_supported()
     scaler = torch.amp.GradScaler("cuda") if use_scaler else None
     aux_ev = st.aux_events(tc["aux"]["max_age_days"]) if tc["aux"]["enabled"] else np.array([], np.int64)
+    n_neg = int(tc["aux"].get("hard_negatives", 8))
     bs = int(tc["slate_batch"])
     steps_per_epoch = max(1, len(train_users) // bs)
+    eval_every = max(1, steps_per_epoch // max(1, int(tc.get("eval_per_epoch", 1))))
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=tc["lr"], total_steps=steps_per_epoch * tc["epochs"],
                                                 pct_start=0.05, anneal_strategy="cos")
     log.info(f"[{name}] {len(train_users):,} training slates, {len(aux_ev):,} auxiliary anchors, "
              f"{sum(x.numel() for x in model.parameters()):,} parameters, device={device}")
     best, best_state, history = -1.0, None, []
+
+    def validate(ep: int, step: int) -> None:
+        nonlocal best, best_state
+        res = evaluate(score_users(model, st, base, val_users, cfg, device), "tower_score", seed=cfg["seed"])
+        history.append({"epoch": ep, "step": step, **res})
+        log.info(f"[{name}] ep {ep} step {step}: val MRR {res['mrr']:.4f} NDCG@10 {res['ndcg10']:.4f} "
+                 f"gNDCG@10 {res['gndcg10']:.4f}")
+        if res["gndcg10"] > best:
+            best = res["gndcg10"]
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        model.train()
+
     step = 0
     for ep in range(tc["epochs"]):
         model.train()
@@ -168,18 +213,30 @@ def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Sto
             b, items, labels = st.slate_batch(ub)
             with autocast(device, tc["amp"]):
                 bd = to_dev(b, device)
-                u = model.user_vec(bd["q"], bd["ctx"], feats)
-                v = model.item_vec(feats(torch.as_tensor(items, device=device)))
-                scores = model.scale() * slate_scores(u, v)
+                it = torch.as_tensor(items, device=device)
+                rows = feats(it)
+                cand_v = model.item(rows)
+                v = F.normalize(cand_v.float(), dim=-1)
+                u = model.user_vec(bd["q"], bd["ctx"], feats, it, cand_rows=rows, cand_v=cand_v)
+                # popularity enters as an explicit offset, not inside either tower
+                scores = model.scale() * slate_scores(u, v) + model.pop_logit(rows)
                 loss = listwise_loss(scores.float(), torch.as_tensor(labels, device=device))
                 aux = torch.zeros((), device=device)
                 if len(aux_ev) and step % tc["aux"]["every"] == 0:
                     ev = aux_ev[rng.integers(0, len(aux_ev), size=min(int(tc["aux"]["batch"]), len(aux_ev)))]
-                    pb, pit, pw = st.pair_batch(ev)
+                    pb, pit, pw, pu = st.pair_batch(ev)
                     pbd = to_dev(pb, device)
                     pit_t = torch.as_tensor(pit, device=device)
-                    aux = inbatch_loss(model.user_vec(pbd["q"], pbd["ctx"], feats), model.item_vec(feats(pit_t)),
-                                       pit_t, torch.as_tensor(pw, device=device), model.scale())
+                    pos_rows = feats(pit_t)
+                    neg, nmask = st.neg_batch(pu, pit, n_neg)
+                    neg_t = torch.as_tensor(neg, device=device)
+                    neg_rows = feats(neg_t)
+                    aux = inbatch_loss(
+                        model.user_vec(pbd["q"], pbd["ctx"], feats, pit_t[:, None])[:, 0],
+                        model.item_vec(pos_rows), pit_t, torch.as_tensor(pw, device=device), model.scale(),
+                        neg_v=model.item_vec(neg_rows), neg_idx=neg_t,
+                        neg_mask=torch.as_tensor(nmask, device=device),
+                        logq_ib=model.logq(pos_rows), logq_neg=model.logq(neg_rows))
                     loss = loss + tc["aux"]["weight"] * aux
             opt.zero_grad(set_to_none=True)
             if scaler:
@@ -197,13 +254,11 @@ def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Sto
                 r = np.mean(run[-tc["log_every"]:], 0)
                 log.info(f"[{name}] ep {ep} step {i+1}/{steps_per_epoch} loss {r[0]:.4f} aux {r[1]:.4f} "
                          f"scale {float(model.scale()):.1f} ({time.time()-t0:.0f}s)")
-        res = evaluate(score_users(model, st, feats, val_users, cfg, device), "tower_score", seed=cfg["seed"])
-        history.append({"epoch": ep, "train_loss": float(np.mean([r[0] for r in run])), **res})
-        log.info(f"[{name}] epoch {ep}: val MRR {res['mrr']:.4f} NDCG@10 {res['ndcg10']:.4f} gNDCG@10 {res['gndcg10']:.4f} "
-                 f"({time.time()-t0:.0f}s)")
-        if res["gndcg10"] > best:
-            best = res["gndcg10"]
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            if (i + 1) % eval_every == 0 or i == steps_per_epoch - 1:
+                validate(ep, i + 1)
+        log.info(f"[{name}] epoch {ep} done ({time.time()-t0:.0f}s)")
+    if best_state is None:                      # validation users had no positives
+        best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
     return {"state": best_state, "history": history, "use_history": use_history, "use_query": use_query}
 
 

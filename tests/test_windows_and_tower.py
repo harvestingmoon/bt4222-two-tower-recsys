@@ -37,7 +37,7 @@ def test_stores_context_segments(tiny_cfg):
     assert list(ctx["short"]["type"][0][ctx["short"]["mask"][0]]) == [1, 1]
     # auxiliary anchor = the last click (1 hour old): only the three earlier events are its context
     ev = st.u_start[1] + 3
-    b, item, w = st.pair_batch(np.array([ev]))
+    b, item, w, _ = st.pair_batch(np.array([ev]))
     assert sum(b["ctx"][s]["mask"].sum() for s in ("short", "mid", "long")) == 3
     assert w[0] == 1.0
     # slates: 8 displayed items per user, labels preserved
