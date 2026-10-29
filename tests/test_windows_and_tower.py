@@ -45,6 +45,23 @@ def test_stores_context_segments(tiny_cfg):
     assert time_bucket(np.array([0]))[0] == 1
 
 
+def test_hard_negatives_only_from_own_training_slates(tiny_cfg):
+    p = paths(tiny_cfg)
+    users, hist, cands, q = (load(p.data, n) for n in ("users", "history", "candidates", "queries"))
+    Q = np.zeros((int(q["qid"].max()) + 2, 4), np.int32)
+    wids = np.sort(pl.concat([cands["wid"], hist["wid"]]).unique().to_numpy())
+    st = Stores(hist, users, cands, Q, wids, tiny_cfg)
+    u = np.array([1, 2])
+    pos = st.s_item[u, 0]
+    allowed = np.zeros(st.n_users, bool)
+    allowed[1] = True
+    neg, ok = st.neg_batch(u, pos, 8, allowed)
+    assert ok[0].any() and not ok[1].any()                     # user 2 is not a training user of this model
+    sl = dict(zip(st.s_item[1], st.s_label[1]))
+    assert all(sl[i] == 0 for i in neg[0][ok[0]])              # only passed-over products, never a positive
+    assert pos[0] not in neg[0][ok[0]]
+
+
 def test_listwise_loss_ignores_padding_and_prefers_positive():
     labels = torch.tensor([[2, 0, 0, -1]])
     good = listwise_loss(torch.tensor([[5.0, 0.0, 0.0, 9.0]]), labels)

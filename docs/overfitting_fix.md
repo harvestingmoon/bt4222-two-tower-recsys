@@ -1,5 +1,9 @@
 # Overfitting: diagnosis, fix and latest full run
 
+> **Note:** the tower and re-ranker results below were produced before the hard-negative leak fix
+> (`Stores.neg_batch` drew negatives from validation/test and held-out-fold slates; see `report/overfit_fixes.md` §5).
+> Stages 03–07 need re-running with `--force` before these numbers are quoted.
+
 ## What was overfitting
 
 The latest code had already fixed the two-tower overfit (train out-of-fold was *below* validation), but the

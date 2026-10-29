@@ -39,6 +39,7 @@ def prepare_full(cfg: dict, force: bool = False) -> None:
     p = paths(cfg, "full")
     log = get_logger("prepare", p)
     if done(p.data) and not force:
+        sync_folds(p.data, cfg, log)
         log.info(f"full data already prepared in {p.data} (use --force to rebuild)")
         return
     user_txt, prod_txt = p.raw / "user_behavior_data.txt", p.raw / "product_meta_data.txt"
@@ -122,10 +123,7 @@ def prepare_full(cfg: dict, force: bool = False) -> None:
     users = (users.join(split_map, on="user_id", how="left")
              .with_columns(split=pl.col("split").fill_null("train"), has_pos=pl.col("n_pos") > 0))  # no positive -> train
     # fold in 0..k-1 for every training user (out-of-fold tower scores and CTR); -1 for validation / test users
-    is_tr = (users["split"] == "train").to_numpy()
-    fold = np.full(users.height, -1, np.int8)
-    fold[is_tr] = np.random.default_rng(seed + 1).permutation(int(is_tr.sum())) % max(k, 1)
-    users = users.with_columns(fold=pl.Series(fold))
+    users = assign_folds(users, k, seed)
 
     (p.data / "_DONE").unlink(missing_ok=True)
     queries.select("qid", "terms", "n_terms").write_parquet(p.data / "queries.parquet")
@@ -166,6 +164,7 @@ def make_subset(cfg: dict, force: bool = False) -> None:
     p = paths(cfg)
     log = get_logger("prepare", p)
     if done(p.data) and not force:
+        sync_folds(p.data, cfg, log, src=paths(cfg, "full").data)
         log.info(f"{p.scope} already prepared in {p.data}")
         return
     src = paths(cfg, "full").data
@@ -190,6 +189,45 @@ def make_subset(cfg: dict, force: bool = False) -> None:
     pl.scan_parquet(src / "products.parquet").join(w.lazy(), on="wid", how="semi").sink_parquet(p.data / "products.parquet")
     (p.data / "_DONE").write_text("ok")
     log.info(f"{p.scope}: {dict(u.group_by('split').len().iter_rows())} users, {c.height:,} impressions, {h.height:,} events")
+
+
+def assign_folds(users: pl.DataFrame, k: int, seed: int) -> pl.DataFrame:
+    """fold in 0..k-1 for every training user (out-of-fold tower scores and CTR); -1 for validation / test users."""
+    is_tr = (users["split"] == "train").to_numpy()
+    fold = np.full(users.height, -1, np.int8)
+    fold[is_tr] = np.random.default_rng(seed + 1).permutation(int(is_tr.sum())) % max(k, 1)
+    return users.with_columns(fold=pl.Series(fold))
+
+
+def n_folds_of(users: pl.DataFrame) -> int:
+    return int(users.filter(pl.col("split") == "train")["fold"].max()) + 1
+
+
+def sync_folds(data_dir, cfg: dict, log, src=None) -> None:
+    """Re-assign folds in place when `prepare.n_folds` changed since the data was prepared (cheap: users table only),
+    giving the same assignment a fresh prepare would. A subsample (`src` = the full data dir) copies the full folds."""
+    users = pl.read_parquet(data_dir / "users.parquet")
+    k = int(cfg["prepare"]["n_folds"])
+    if n_folds_of(users) == k:
+        return
+    log.info(f"{data_dir}: re-assigning {n_folds_of(users)} -> {k} cross-fitting folds "
+             "(downstream stages then refuse their old outputs: re-run them with --force)")
+    if src is None:
+        users = assign_folds(users.sort("user_id"), k, cfg["seed"])
+    else:
+        full = pl.read_parquet(src / "users.parquet", columns=["user_id", "fold"])
+        users = users.drop("fold").join(full, on="user_id", how="left").select(users.columns)
+    users.write_parquet(data_dir / "users.parquet")
+
+
+def check_folds(users: pl.DataFrame, cfg: dict) -> None:
+    """Fail loudly when the prepared folds no longer match `prepare.n_folds` (e.g. data prepared with 2 folds, config now
+    5): cross-fitting would otherwise silently keep the old fold count and leave the extra folds empty."""
+    k = int(cfg["prepare"]["n_folds"])
+    have = n_folds_of(users)
+    if have != k:
+        raise ValueError(f"prepared data has {have} folds but prepare.n_folds = {k}: re-run "
+                         f"`00_prepare.py` (re-assigns the folds), then the later stages with --force")
 
 
 def load(data_dir, name: str, columns=None) -> pl.DataFrame:

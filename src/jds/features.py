@@ -20,8 +20,8 @@ import time
 
 import polars as pl
 
-from .config import get_logger, paths, save_json
-from .prepare import load
+from .config import check_fresh, get_logger, paths, save_json
+from .prepare import check_folds, load
 from .windows import CART, ORD, feature_windows, window_expr
 
 ATTR_KEYS = ["brand_id", "shop_id", "cate_id_4"]          # attributes a user / query can have affinity for
@@ -85,6 +85,7 @@ def ctr_tables(source: pl.DataFrame, prior: float) -> dict[tuple, pl.DataFrame]:
 def oof_ctr_tables(labelled: pl.DataFrame, users: pl.DataFrame, cfg) -> tuple[dict, float]:
     """CTR tables per fold: fold f (training users of fold f) is built from the *other* folds' training users;
     fold -1 (validation and test users) from all training users. `labelled` = candidates with qid and attributes."""
+    check_folds(users, cfg)
     tr = users.filter(pl.col("split") == "train").select("user_id", "fold")
     lab = labelled.join(tr, on="user_id")
     prior = cfg["features"]["ctr_prior"]
@@ -220,6 +221,8 @@ def build(cfg: dict, force: bool = False) -> list[str]:
     p = paths(cfg)
     log = get_logger("features", p)
     if (p.features / "feature_list.json").exists() and not force:
+        check_folds(load(p.data, "users", ["split", "fold"]), cfg)
+        check_fresh(p.features / "feature_list.json", p.data / "users.parquet")
         log.info(f"features exist in {p.features} (use --force to rebuild)")
         from .config import load_json
         return load_json(p.features / "feature_list.json")

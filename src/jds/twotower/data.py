@@ -240,13 +240,19 @@ class Stores:
         b = {"q": self.qterms[self.h_qid[ev]], "ctx": self.context(u, ev, self.h_age[ev])}
         return b, self.h_item[ev], TYPE_WEIGHT[self.h_type[ev]], u
 
-    def neg_batch(self, users: np.ndarray, pos: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
-        """Up to k items from each anchor's own slate as hard negatives, excluding the positive.
+    def neg_batch(self, users: np.ndarray, pos: np.ndarray, k: int,
+                  allowed: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
+        """Up to k items from the anchor user's slate as hard negatives: products shown and passed over (label 0),
+        excluding the anchor's own item. A far harder negative than another anchor's positive.
 
-        These are the products the user was actually shown and passed over, which is a far harder negative than
-        another anchor's positive. Returns (row indices [B,k], validity mask [B,k])."""
-        sl = self.s_item[np.asarray(users, np.int64)]
-        keep = (sl > 0) & (sl != np.asarray(pos)[:, None])
+        The slate is the user's final (labelled) search, so only users in `allowed` (bool [n_users], the model's
+        training users) may contribute: otherwise validation / test / held-out-fold slates leak into training and
+        their positives are pushed down. Returns (row indices [B,k], validity mask [B,k])."""
+        users = np.asarray(users, np.int64)
+        sl = self.s_item[users]
+        keep = (sl > 0) & (self.s_label[users] == 0) & (sl != np.asarray(pos)[:, None])
+        if allowed is not None:
+            keep &= allowed[users][:, None]
         order = np.argsort(~keep, axis=1, kind="stable")[:, :k]
         return np.take_along_axis(sl, order, 1), np.take_along_axis(keep, order, 1)
 

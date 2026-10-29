@@ -44,9 +44,12 @@ Two fixes to the in-batch softmax on historical `(query, item)` pairs:
 - **Popularity correction.** In-batch negatives are effectively sampled proportional to frequency, so the loss
   rewards items for being common. `inbatch_loss` subtracts `model.logq(...)`, a learned multiple of log popularity
   (the sampled-softmax bias correction).
-- **Slate hard negatives.** Each anchor now also competes against up to `aux.hard_negatives: 8` items from *its own*
-  slate that the user was shown and passed over — much harder than another anchor's positive. `Stores.neg_batch`
-  builds them vectorised; the positive is excluded and invalid slots are masked.
+- **Slate hard negatives.** Each anchor also competes against up to `aux.hard_negatives: 8` products from the
+  anchor user's slate that were shown and passed over (label 0) — much harder than another anchor's positive.
+  `Stores.neg_batch` builds them vectorised; the anchor's own item is excluded and invalid slots are masked. The
+  slate is the user's *final* (labelled) search, not the search the anchor came from, so only the model's own
+  training users may contribute: anchors from validation, test or held-out-fold users get no hard negatives,
+  otherwise those slates would leak into training and their positives would be pushed down.
 
 ## 6. History segments simplified
 

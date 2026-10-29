@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=${PYTHON:-python}
-"$PY" -m pytest -q
+OMP_NUM_THREADS=1 "$PY" -m pytest -q   # torch + lightgbm each bundle OpenMP: multi-threaded pytest segfaults on macOS
 rm -rf outputs/sample_2000
 PYTHON="$PY" bash scripts/run_all.sh configs/smoke.yaml
 "$PY" scripts/07_diagnostics.py --config configs/smoke.yaml --parts ablations

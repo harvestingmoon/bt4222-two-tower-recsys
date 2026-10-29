@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import polars as pl
 
-from ..config import get_device, get_logger, paths, save_json
+from ..config import check_fresh, get_device, get_logger, paths, save_json
 from ..metrics import evaluate, results_table
+from ..prepare import load
 from .train import ItemFeats, load_assets, load_model, make_stores, model_plan, score_users
 
 
@@ -17,6 +18,9 @@ def score(cfg: dict, variant: str = "", force: bool = False) -> pl.DataFrame:
     log = get_logger("tower", p)
     out = p.tower / (f"tower_scores_{variant}.parquet" if variant else "tower_scores.parquet")
     if out.exists() and not force:
+        names = [f"full_{variant}"] if variant else [n for n, _, _ in model_plan(cfg, load(p.data, "users"))]
+        cks = [p.tower / f"{n}.pt" for n in names]
+        check_fresh(out, p.data / "users.parquet", *cks)
         log.info(f"{out.name} exists (use --force to rescore)")
         return pl.read_parquet(out)
     device = get_device(cfg)

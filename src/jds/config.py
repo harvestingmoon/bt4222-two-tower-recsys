@@ -156,3 +156,11 @@ def save_json(obj, path: Path) -> None:
 def load_json(path: Path):
     with open(path) as f:
         return json.load(f)
+
+
+def check_fresh(out: Path, *inputs: Path) -> None:
+    """A stage skips work whose output exists; refuse to reuse `out` if one of its inputs was rebuilt after it."""
+    newer = [i.name for i in inputs if i.exists() and i.stat().st_mtime > out.stat().st_mtime]
+    if newer:
+        raise RuntimeError(f"{out} is older than {', '.join(newer)}, which it was built from: "
+                           "re-run this stage with --force (or run_all.sh --force)")

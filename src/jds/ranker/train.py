@@ -12,7 +12,7 @@ import lightgbm as lgb
 import numpy as np
 import polars as pl
 
-from ..config import get_logger, paths, save_json
+from ..config import check_fresh, get_logger, paths, save_json
 from . import dataset
 
 
@@ -54,6 +54,7 @@ def train(cfg: dict, force: bool = False) -> None:
     log = get_logger("ranker", p)
     out = p.ranker / "ranker.txt"
     if out.exists() and not force:
+        check_fresh(out, p.features / "feature_list.json", p.tower / "tower_scores.parquet")
         log.info("ranker exists (use --force to retrain)")
         return
     names = dataset.feature_names(p)

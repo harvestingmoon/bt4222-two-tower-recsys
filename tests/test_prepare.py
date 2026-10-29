@@ -1,8 +1,14 @@
+import copy
+import logging
+import os
+import shutil
+
 import numpy as np
 import polars as pl
+import pytest
 
-from jds.config import paths
-from jds.prepare import load
+from jds.config import check_fresh, paths
+from jds.prepare import check_folds, load, n_folds_of, sync_folds
 
 
 def test_history_ages(tiny_cfg):
@@ -40,3 +46,29 @@ def test_products_restricted_and_queries(tiny_cfg):
     assert 999 not in pr["wid"].to_list()
     q = load(p.data, "queries")
     assert q["terms"].list.len().min() >= 1     # empty tokens removed ("a^X^Xb" -> [a, b])
+
+
+def test_fold_change_is_resynced_and_checked(tiny_cfg, tmp_path):
+    src = paths(tiny_cfg).data
+    shutil.copy(src / "users.parquet", tmp_path / "users.parquet")
+    before = pl.read_parquet(tmp_path / "users.parquet")
+    cfg = copy.deepcopy(tiny_cfg)
+    cfg["prepare"]["n_folds"] = tiny_cfg["prepare"]["n_folds"] + 1
+    with pytest.raises(ValueError):
+        check_folds(before, cfg)                                   # stale folds are refused, not silently reused
+    sync_folds(tmp_path, cfg, logging.getLogger("t"))
+    after = pl.read_parquet(tmp_path / "users.parquet")
+    check_folds(after, cfg)
+    assert n_folds_of(after) == cfg["prepare"]["n_folds"]
+    assert after.drop("fold").equals(before.drop("fold"))          # only the fold column changes
+    assert (after.filter(pl.col("split") != "train")["fold"] == -1).all()
+
+
+def test_check_fresh(tmp_path):
+    out, inp = tmp_path / "out", tmp_path / "in"
+    inp.write_text("x"); out.write_text("y")
+    os.utime(inp, (1, 1))
+    check_fresh(out, inp, tmp_path / "missing")                    # older or missing inputs are fine
+    os.utime(inp, (out.stat().st_mtime + 10,) * 2)
+    with pytest.raises(RuntimeError):
+        check_fresh(out, inp)

@@ -19,20 +19,28 @@ import polars as pl
 import torch
 import torch.nn.functional as F
 
-from ..config import get_device, get_logger, load_json, paths, save_json, set_seed
+from ..config import check_fresh, get_device, get_logger, load_json, paths, save_json, set_seed
 from ..metrics import evaluate
-from ..prepare import load
+from ..prepare import check_folds, load
 from .data import C_NAME, ID_COLS, Stores, TermVocab, build_id_vocabs, build_item_matrix, build_term_vocab, item_popularity, query_matrix
 from .model import TwoTower
 
 
 # ---------------------------------------------------------------- assets (vocabularies, item matrix, query matrix)
+ASSET_KEYS = ("min_term_count", "max_terms", "oov_buckets", "term_count_docs", "query_len")   # settings baked into assets
+
+
 def build_assets(cfg: dict, force: bool = False) -> None:
     p = paths(cfg)
     log = get_logger("tower", p)
     f = p.tower / "assets.npz"
+    sig = np.array([cfg["tower"][k] for k in ASSET_KEYS], np.int64)
     if f.exists() and not force:
-        return
+        with np.load(f) as old:
+            if "sig" in old and np.array_equal(old["sig"], sig):
+                return
+        raise ValueError(f"{f} was built with other vocabulary settings ({', '.join(ASSET_KEYS)}) or older code: "
+                         f"re-run 03_train_tower.py --force (also retrains the towers) or use a new paths.work_dir")
     t0 = time.time()
     tc = cfg["tower"]
     prods = pl.scan_parquet(p.data / "products.parquet")
@@ -45,7 +53,7 @@ def build_assets(cfg: dict, force: bool = False) -> None:
     X = build_item_matrix(item_wids, p.data / "products.parquet", tv, idv, item_popularity(history, cfg))
     Q = query_matrix(queries, tv, tc["query_len"])
     np.savez(f, X=X, Q=Q, item_wids=item_wids, terms=tv.terms, oov=tv.oov,
-             id_sizes=np.array([idv[c].size for c in ID_COLS]))
+             id_sizes=np.array([idv[c].size for c in ID_COLS]), sig=sig)
     log.info(f"assets: {len(item_wids):,} items, {tv.size:,} term rows, {Q.shape[0]:,} queries ({time.time()-t0:.0f}s)")
 
 
@@ -183,6 +191,8 @@ def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Sto
     scaler = torch.amp.GradScaler("cuda") if use_scaler else None
     aux_ev = st.aux_events(tc["aux"]["max_age_days"]) if tc["aux"]["enabled"] else np.array([], np.int64)
     n_neg = int(tc["aux"].get("hard_negatives", 8))
+    neg_ok = np.zeros(st.n_users, bool)          # hard negatives only from this model's own training slates
+    neg_ok[train_users] = True
     bs = int(tc["slate_batch"])
     steps_per_epoch = max(1, len(train_users) // bs)
     eval_every = max(1, steps_per_epoch // max(1, int(tc.get("eval_per_epoch", 1))))
@@ -228,7 +238,7 @@ def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Sto
                     pbd = to_dev(pb, device)
                     pit_t = torch.as_tensor(pit, device=device)
                     pos_rows = feats(pit_t)
-                    neg, nmask = st.neg_batch(pu, pit, n_neg)
+                    neg, nmask = st.neg_batch(pu, pit, n_neg, neg_ok)
                     neg_t = torch.as_tensor(neg, device=device)
                     neg_rows = feats(neg_t)
                     aux = inbatch_loss(
@@ -264,6 +274,7 @@ def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Sto
 
 def model_plan(cfg: dict, users: pl.DataFrame) -> list[tuple[str, np.ndarray, np.ndarray]]:
     """(model name, training users, users it scores) for cross-fitting."""
+    check_folds(users, cfg)
     tr = users.filter((pl.col("split") == "train") & pl.col("has_pos"))
     plan = []
     for f in range(cfg["prepare"]["n_folds"]):
@@ -291,6 +302,7 @@ def train(cfg: dict, models: list[str] | None = None, variant: str = "", force: 
         tag = f"{name}_{variant}" if variant else name
         out = p.tower / f"{tag}.pt"
         if out.exists() and not force:
+            check_fresh(out, p.data / "users.parquet", p.tower / "assets.npz")
             log.info(f"[{tag}] exists, skipping (use --force to retrain)")
             continue
         r = train_one(tag, tr_users, val_users, st, a, cfg, device, log,
