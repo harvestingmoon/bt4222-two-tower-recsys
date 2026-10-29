@@ -125,7 +125,7 @@ flowchart TD
     F --> B["02b baselines<br/>popularity, CTR, BM25"]
     P --> N["02c prior team's<br/>Hybrid NCF + LSTM<br/>+ gap diagnosis"]
     F --> W["02d window ablation<br/>windowed vs naive<br/>history features"]
-    P --> T["03 train two-tower<br/>fold0, fold1 (cross-fit)<br/>+ full"]
+    P --> T["03 train two-tower<br/>fold0…fold4 (cross-fit)<br/>+ full"]
     T --> S["04 score tower<br/>out-of-fold for train users,<br/>full model for val / test"]
     F --> K["05 train LambdaRank<br/>train users, early stop on val"]
     S --> K
@@ -184,8 +184,9 @@ Counted back from each user's test query, **clicks are kept only for 7 days, car
   built from the other folds; validation/test users see tables built from all training users
   (`tests/test_features.py::test_ctr_is_out_of_fold` flips one user's labels and checks its features do not change).
 - **Cross-fitting of the tower**: the ranker learns on training users, so their tower scores come from tower models
-  that never saw their slates (`fold0` scores fold 0, trained on fold 1, and vice versa); validation/test users are
-  scored by the `full` tower. Otherwise the ranker would learn to trust an over-fitted tower score.
+  that never saw their slates (`fold k` trains on the other four folds and scores fold k); validation/test users are
+  scored by the `full` tower. Five folds keep out-of-fold features close to the all-training regime the ranker sees at
+  validation/test time. Otherwise the ranker would learn to trust an over-fitted tower score.
 
 **Two-tower model** (`src/jds/twotower/`).
 - *Item tower*: mean term embeddings of title (20 terms), brand (4) and category L3+L4 names (6); embeddings of brand,
@@ -228,7 +229,7 @@ All outputs go to `outputs/<scope>/` (`full`, or `sample_<N>` for a user subsamp
 | `02b_baselines.py` | non-learned baselines | `results/baselines.json` | 5 s |
 | `02c_prior_ncf.py` | previous team's model (2 variants × 3 epochs) + measured structural gaps | `results/prior_ncf.json`, `results/prior_ncf_gaps.json` | GPU: est. 10–20 min |
 | `02d_window_ablation.py` | 4 rankers on 30% of training users: windowed vs naive history features | `results/window_ablation*.csv`, `figures/window_ablation.png` | CPU: est. 20–40 min |
-| `03_train_tower.py` | 3 towers (`fold0`, `fold1`, `full`) × 3 epochs ≈ 13k steps; first builds the item matrix (12.3 M items, ~2 min) | `tower/assets.npz`, `tower/*.pt`, `tower/*_history.json` | GPU: est. 30–90 min (not measured; 1.7 s/step on laptop CPU) |
+| `03_train_tower.py` | 6 towers (`fold0`…`fold4`, `full`) × 2 epochs ≈ 13k steps; first builds the item matrix (12.3 M items, ~1 min) | `tower/assets.npz`, `tower/*.pt`, `tower/*_history.json` | GPU: ~12 min on an H100 |
 | `04_score_tower.py` | cross-fitted scores for all 15.5 M displayed items | `tower/tower_scores.parquet`, `results/tower.json` | GPU: est. 5–10 min |
 | `05_train_ranker.py` | LambdaRank on ~137k training slates | `ranker/ranker.txt`, `results/ranker_feature_importance.csv` | CPU: est. 10–30 min, ~15 GB RAM |
 | `06_predict.py` | re-rank val/test (+ 25% of training users for training performance), final tables | `predictions/ranker_{val,test}.parquet`, `results/ranker.json`, `results/summary_test.csv`, `results/summary_all_splits.csv` | ~2 min |

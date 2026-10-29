@@ -215,20 +215,25 @@ def attention(cfg, p, log) -> dict:
     model = load_model(p.tower / "full.pt", a, device)
     feats = ItemFeats(a["X"], device, cfg["tower"]["item_matrix_on_gpu"] and device == "cuda")
     ids = users.filter(pl.col("split") == "test")["user_id"].to_numpy()[: cfg["diagnostics"]["attention_users"]]
-    res = {s: {"null_mass": [], "nonempty": []} for s in SEGMENTS}
+    # Only the short window is attended in the current architecture; mid/long are summarised by per-type counts.
+    # Attention is candidate-aware: average the null-slot mass over the real candidates of each slate.
+    null_mass, nonempty = [], []
     for i in range(0, len(ids), cfg["tower"]["eval_batch_users"]):
-        b = to_dev(st.user_batch(ids[i:i + cfg["tower"]["eval_batch_users"]]), device)
-        model.user_vec(b["q"], b["ctx"], feats)
-        for s in SEGMENTS:
-            att = model.user.pools[s].last_attn.float().cpu().numpy()
-            nonempty = b["ctx"][s]["mask"].any(-1).cpu().numpy()
-            res[s]["null_mass"].append(att[:, 0])
-            res[s]["nonempty"].append(nonempty)
-    out = {}
-    for s in SEGMENTS:
-        nm, ne = np.concatenate(res[s]["null_mass"]), np.concatenate(res[s]["nonempty"])
-        out[s] = {"share_users_with_events": float(ne.mean()),
-                  "mean_attention_on_events_when_present": float(1 - nm[ne].mean()) if ne.any() else None}
+        ub = ids[i:i + cfg["tower"]["eval_batch_users"]]
+        b, items, _ = st.slate_batch(ub)
+        b = to_dev(b, device)
+        it = torch.as_tensor(items, device=device)
+        rows = feats(it)
+        model.user_vec(b["q"], b["ctx"], feats, it, cand_rows=rows, cand_v=model.item(rows))
+        att = model.user.attn.last_attn.float().cpu().numpy()          # [B,S,L+1]
+        keep = (items > 0)                                             # real candidate slots
+        null_mass.append((att[..., 0] * keep).sum(1) / keep.sum(1).clip(1))
+        nonempty.append(b["ctx"]["short"]["mask"].any(-1).cpu().numpy())
+    nm, ne = np.concatenate(null_mass), np.concatenate(nonempty)
+    out = {"short": {"share_users_with_events": float(ne.mean()),
+                     "mean_attention_on_events_when_present": float(1 - nm[ne].mean()) if ne.any() else None},
+           "mid": {"attention": "none (per-type counts only)"},
+           "long": {"attention": "none (per-type counts only)"}}
     save_json(out, p.results / "diag_attention.json")
     log.info(f"tower attention by history segment: {out}")
     return out

@@ -12,7 +12,9 @@ device: auto                 # auto | cuda | mps | cpu
 
 prepare:
   split: {train: 0.8, val: 0.1, test: 0.1}
-  n_folds: 2                 # cross-fitting folds over training users (out-of-fold tower scores and CTR encoding)
+  n_folds: 5                 # cross-fitting folds over training users (out-of-fold tower scores and CTR encoding)
+                             # 5 folds: train OOF features use 80% of users vs 50% with 2 folds, closer to the
+                             # all-training tables that validation/test users see
 
 # JDsearch history is three logs with different retention windows, counted back from each user's test query.
 # Every history feature is computed per event type inside that type's own window.
@@ -26,7 +28,8 @@ windows:
 
 features:
   chunk_users: 20000         # users per feature chunk (bounds memory)
-  ctr_prior: 20              # Bayesian shrinkage of impression CTR towards the global rate
+  ctr_prior: 50              # Bayesian shrinkage of impression CTR towards the global rate (was 20: rare
+                             # item-level CTR keys were noisy and gave the ranker an easy way to memorise)
   bm25: {k1: 1.2, b: 0.75, idf_docs: 1000000}
   query_history_jaccard: 0.5
 
@@ -72,12 +75,15 @@ ranker:
     objective: lambdarank
     metric: ndcg
     eval_at: [1, 10]
-    learning_rate: 0.05
-    num_leaves: 63
-    min_data_in_leaf: 200
-    feature_fraction: 0.8
-    bagging_fraction: 0.8
+    learning_rate: 0.03
+    num_leaves: 31
+    min_data_in_leaf: 1000
+    max_depth: 7
+    feature_fraction: 0.5
+    bagging_fraction: 0.7
     bagging_freq: 1
+    lambda_l2: 5.0
+    path_smooth: 10.0
     lambdarank_truncation_level: 30
     num_threads: 0
     verbose: -1

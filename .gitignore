@@ -1,5 +1,7 @@
 .venv/
 outputs/
+outputs_*/
+*.log
 data/raw/*
 !data/raw/README.md
 __pycache__/
