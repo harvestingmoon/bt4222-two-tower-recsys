@@ -1,0 +1,26 @@
+{
+  "uses_test_query": false,
+  "displayed_items_without_item_embedding (cold, not in history >= min_item_count)": 0.683585356901684,
+  "positives_without_item_embedding": 0.38628913932507103,
+  "published_variant_wrong_attributes_share (items with metadata)": 0.99999934388928,
+  "published_variant_wrong_attributes_share_positives": 1.0,
+  "train_items_per_list_sampled": 9.283108413038098,
+  "test_items_per_slate_full": 89.15837894491673,
+  "history_truncated_to_last_events": 200,
+  "users_with_history_longer_than_maxlen": 0.2332898044652565,
+  "users_with_history": 173831,
+  "user_meta_features": [
+    "nunique_cats_1",
+    "nunique_cats_2",
+    "nunique_cats_3",
+    "nunique_cats_4",
+    "history_len",
+    "click_ratio",
+    "cart_ratio",
+    "order_ratio",
+    "avg_gap",
+    "std_gap",
+    "max_gap"
+  ],
+  "note": "click/cart/order ratios over the whole history mix retention windows (see eda.json recency_confound)"
+}

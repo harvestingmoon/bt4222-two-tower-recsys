@@ -1,5 +1,10 @@
 .venv/
-outputs/
+outputs/*
+!outputs/full/
+outputs/full/*
+# small result tables and figures are committed; data, features and models stay out
+!outputs/full/results/
+!outputs/full/figures/
 outputs_*/
 *.log
 data/raw/*

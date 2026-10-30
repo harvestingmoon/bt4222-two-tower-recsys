@@ -128,6 +128,7 @@ def slate_stats(cands: pl.DataFrame, history: pl.DataFrame) -> dict:
 
 def fig_funnel(funnel: pl.DataFrame, slates: dict, path) -> None:
     fig, ax = plt.subplots(1, 2, figsize=(13, 4.2))
+    funnel = funnel.filter(pl.col("events") >= 1000)       # e.g. "365+" holds one boundary event: a ratio of noise
     x = funnel["bucket"].to_list()
     ax[0].plot(x, funnel["clicks_per_cart"].to_numpy(), "o-", color=COLORS[1], label="clicks per cart")
     ax[0].plot(x, funnel["carts_per_order"].to_numpy(), "s-", color=COLORS[3], label="carts per order")

@@ -33,7 +33,7 @@ Everything runs from the command line (`scripts/`) or, stage by stage, from the 
 
 1. Put the two raw files in your Google Drive under `MyDrive/bt4222/raw/` (see [data/raw/README.md](data/raw/README.md)).
 2. Open the notebooks in order from GitHub in Colab (*File → Open notebook → GitHub*, repository
-   `clarequek/bt4222-two-tower-recsys`) and set *Runtime → Change runtime type → GPU*.
+   `harvestingmoon/bt4222-two-tower-recsys`) and set *Runtime → Change runtime type → GPU*.
 3. Run each notebook top to bottom. Its first cell mounts Drive, clones the repository, installs the requirements and
    writes all outputs to `MyDrive/bt4222/outputs/`, so later notebooks (and later sessions) reuse earlier results.
 
@@ -59,7 +59,7 @@ step 6. Set `CONFIG = "configs/smoke.yaml"` in the first cell for a quick check 
 ≥ 32 GB RAM, ~20 GB free disk, Python 3.11 or 3.12. The scripts also run on CPU / Apple Silicon (slowly for the tower).
 
 ```bash
-git clone https://github.com/clarequek/bt4222-two-tower-recsys.git
+git clone https://github.com/harvestingmoon/bt4222-two-tower-recsys.git
 cd bt4222-two-tower-recsys
 python3 -m venv .venv
 source .venv/bin/activate

@@ -1,0 +1,19 @@
+{
+  "users": 173831,
+  "users_with_pos": 171728,
+  "impressions": 15510012,
+  "history_events": 26667260,
+  "distinct_queries": 1740829,
+  "items_with_metadata": 11588589,
+  "split_sizes": {
+    "val": 17172,
+    "train": 139485,
+    "test": 17174
+  },
+  "positives_first_in_raw_order": 1.0,
+  "integrity": {
+    "history lists have equal length": true,
+    "time list is one longer (includes the test query)": true,
+    "candidate ids and labels have equal length": true
+  }
+}
