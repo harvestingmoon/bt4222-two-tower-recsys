@@ -1,9 +1,5 @@
 # Overfitting: diagnosis, fix and latest full run
 
-> **Note:** the tower and re-ranker results below were produced before the hard-negative leak fix
-> (`Stores.neg_batch` drew negatives from validation/test and held-out-fold slates; see `report/overfit_fixes.md` §5).
-> Stages 03–07 need re-running with `--force` before these numbers are quoted.
-
 ## What was overfitting
 
 The latest code had already fixed the two-tower overfit (train out-of-fold was *below* validation), but the
@@ -11,9 +7,9 @@ The latest code had already fixed the two-tower overfit (train out-of-fold was *
 
 | model | train | val | test | train − test |
 |---|---|---|---|---|
-| two-tower NDCG@10 | 0.1828 (OOF) | 0.1851 | 0.1818 | −0.001 |
-| re-ranker NDCG@10 | 0.4766 | 0.4592 | 0.4607 | **0.0159** |
-| re-ranker MRR | 0.4825 | 0.4604 | 0.4613 | **0.0212** |
+| two-tower NDCG@10 | 0.1828 (OOF) | 0.1848 | 0.1827 | 0.000 |
+| re-ranker NDCG@10 | 0.4783 | 0.4599 | 0.4615 | **0.0168** |
+| re-ranker MRR | 0.4847 | 0.4606 | 0.4622 | **0.0225** |
 
 (The previous run had a train − test NDCG gap of **0.032** and MRR gap of **0.042**.)
 
@@ -43,9 +39,9 @@ The latest code had already fixed the two-tower overfit (train out-of-fold was *
 
 | split | MRR | NDCG@10 |
 |---|---|---|
-| train (out-of-fold) | 0.2049 | 0.1828 |
-| val | 0.2062 | 0.1851 |
-| test | 0.2045 | 0.1818 |
+| train (out-of-fold) | 0.2048 | 0.1828 |
+| val | 0.2070 | 0.1848 |
+| test | 0.2050 | 0.1827 |
 
 Train ≈ val ≈ test: the tower is **not overfitting**. Every fold's validation gNDCG@10 improved monotonically through
 epoch 1 (e.g. fold3: 0.1638 → 0.1758 → 0.1829 → 0.1830).
@@ -54,12 +50,13 @@ epoch 1 (e.g. fold3: 0.1638 → 0.1758 → 0.1829 → 0.1830).
 
 | split | MRR | P@1 | NDCG@10 | gNDCG@10 | HR@10 | R@10 | R@50 |
 |---|---|---|---|---|---|---|---|
-| train | 0.4825 | 0.3422 | 0.4766 | — | 0.7731 | 0.6518 | 0.9260 |
-| val | 0.4604 | 0.3170 | 0.4592 | — | 0.7633 | 0.6420 | 0.9233 |
-| **test** | **0.4613** | **0.3174** | **0.4607** | **0.4550** | **0.7627** | **0.6430** | **0.9235** |
+| train | 0.4847 | 0.3447 | 0.4783 | — | 0.7748 | 0.6524 | 0.9272 |
+| val | 0.4606 | 0.3166 | 0.4599 | — | 0.7639 | 0.6434 | 0.9234 |
+| **test** | **0.4622** | **0.3182** | **0.4615** | **0.4557** | **0.7633** | **0.6435** | **0.9245** |
 
-Against the previous run: test NDCG@10 **0.4601 → 0.4607**, MRR **0.4609 → 0.4613**, while the train–test gap roughly
-halved. The test score is essentially flat, but the model is materially less overfit.
+Against the pre-fix run: test NDCG@10 **0.4601 → 0.4615**, MRR **0.4609 → 0.4622**, while the train–test gap
+roughly halved. The latest numbers include the hard-negative leak fix (hard negatives only from the model's own
+training users, label-0 items only).
 
 ### Baselines (test)
 
@@ -67,8 +64,8 @@ halved. The test score is essentially flat, but the model is materially less ove
 |---|---|---|
 | Popularity (all history) | 0.3435 | 0.3525 |
 | Prior team NCF+LSTM (fixed) | 0.1708 | 0.1644 |
-| Two-tower only | 0.2045 | 0.1818 |
-| **Two-tower + LambdaRank** | **0.4613** | **0.4607** |
+| Two-tower only | 0.2050 | 0.1827 |
+| **Two-tower + LambdaRank** | **0.4622** | **0.4615** |
 
 ## Why 0.9 is not reachable
 
