@@ -1,5 +1,5 @@
 model,mrr,p1,ndcg10,gndcg10,hr10,r10,r50,n_users,n_features
 windowed (pipeline),0.4586,0.3147,0.4575,0.4515,0.7582,0.6383,0.923,17174,105
-"naive (all-history counts, decay, ratios)",0.4586,0.3151,0.458,0.4521,0.7599,0.64,0.9223,17174,114
+"naive (all-history counts, decay, ratios)",0.4591,0.3162,0.4582,0.4524,0.76,0.64,0.9229,17174,114
 windowed + naive ratios,0.4588,0.3162,0.4577,0.4517,0.7577,0.6386,0.9233,17174,108
 no history counts,0.4123,0.2655,0.4164,0.4109,0.7249,0.6057,0.9156,17174,48

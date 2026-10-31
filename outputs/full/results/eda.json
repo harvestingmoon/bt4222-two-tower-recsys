@@ -20,7 +20,7 @@
     },
     {
       "statistic": "std",
-      "value": 38.85735653740629
+      "value": 38.8573565374063
     },
     {
       "statistic": "min",
@@ -58,7 +58,7 @@
     },
     {
       "statistic": "std",
-      "value": 224.80155611157517
+      "value": 224.8015561115751
     },
     {
       "statistic": "min",
@@ -212,7 +212,7 @@
     }
   ],
   "recency_confound": {
-    "corr_click_ratio_vs_recent_share": 0.9531554961566884,
+    "corr_click_ratio_vs_recent_share": 0.9531554961566894,
     "users_without_clicks": 0.16213448694421595,
     "n_users": 173831
   },

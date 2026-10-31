@@ -6,9 +6,9 @@
   "distinct_queries": 1740829,
   "items_with_metadata": 11588589,
   "split_sizes": {
-    "val": 17172,
+    "test": 17174,
     "train": 139485,
-    "test": 17174
+    "val": 17172
   },
   "positives_first_in_raw_order": 1.0,
   "integrity": {
