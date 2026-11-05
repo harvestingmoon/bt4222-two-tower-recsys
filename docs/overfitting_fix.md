@@ -85,14 +85,15 @@ Same users, hand-crafted features and LambdaRank parameters; only `tower_score`,
 
 | model | test MRR | test NDCG@10 |
 |---|---|---|
-| two-tower + LambdaRank | **0.4601** | **0.4596** |
-| LambdaRank, no tower (early / matched rounds) | 0.4579 | 0.4575 |
-| **tower contribution** | **+0.0022** | **+0.0021** |
+| two-tower + LambdaRank (860 trees) | **0.4601** | **0.4596** |
+| LambdaRank, no tower, early-stopped (718 trees) | 0.4579 | 0.4575 |
+| LambdaRank, no tower, matched 860 trees | 0.4591 | 0.4584 |
+| **tower contribution (matched 860)** | **+0.0010** | **+0.0012** |
 
-The tower adds only ~0.002 beyond the hand-crafted features. That is an honest limitation of the current
-two-tower design: most of the ranking signal is already in the windowed history, popularity, CTR and slate
-features, and the exported cosine is deliberately popularity-free. The tower is not the main driver of the
-final score in this slate re-ranking setup.
+The tower adds only ~0.001 beyond the hand-crafted features when tree count is held constant. That is an honest
+limitation of the current two-tower design: most of the ranking signal is already in the windowed history,
+popularity, CTR and slate features, and the exported cosine is deliberately popularity-free. The tower is not
+the main driver of the final score in this slate re-ranking setup.
 
 ## Why 0.9 is not reachable
 

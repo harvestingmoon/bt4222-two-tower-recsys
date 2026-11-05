@@ -274,9 +274,10 @@ reaches test MRR 0.455 / NDCG@10 0.454, against 0.344 / 0.353 for the best non-l
 (popularity). The full run (all users, plus the tower score) should match or beat this; if
 it does not, something is wrong.
 
-Matched no-tower ablation on the final run: **MRR 0.4579 / NDCG@10 0.4575** without the tower score vs
-**0.4601 / 0.4596** with it — the tower adds only **+0.0022 MRR / +0.0021 NDCG@10** beyond the hand-crafted
-features. See `results/no_tower_ablation.csv`.
+Matched no-tower ablation on the final run: **MRR 0.4579 / NDCG@10 0.4575** at its own early-stopped 718 trees,
+and **0.4591 / 0.4584** when forced to the final ranker's 860 trees, vs **0.4601 / 0.4596** with the tower
+score — a **+0.0010 MRR / +0.0012 NDCG@10** contribution from the tower. See
+`results/no_tower_ablation.csv`.
 
 Optional tower ablations (for the report):
 

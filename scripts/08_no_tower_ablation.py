@@ -34,7 +34,7 @@ from jds.metrics import evaluate, results_table  # noqa: E402
 from jds.ranker import dataset  # noqa: E402
 
 
-def _fit(cfg: dict, p, names: list[str], log):
+def _fit(cfg: dict, p, names: list[str], log, num_boost_round: int | None = None, early_stopping: bool = True):
     rc = cfg["ranker"]
     tr = dataset.load(p, ["train"], cfg, use_tower=False, only_with_pos=True)
     va = dataset.load(p, ["val"], cfg, use_tower=False, only_with_pos=True)
@@ -46,11 +46,14 @@ def _fit(cfg: dict, p, names: list[str], log):
                       feature_name=names, free_raw_data=True)
     dva = lgb.Dataset(va.select(names).to_numpy(), va["label"].to_numpy(), group=dataset.groups(va), reference=dtr)
     del tr, va
-    booster = lgb.train(params, dtr, num_boost_round=rc["num_boost_round"], valid_sets=[dva],
-                        valid_names=["val"],
-                        callbacks=[lgb.early_stopping(rc["early_stopping_rounds"], verbose=False),
-                                   lgb.log_evaluation(max(1, rc["num_boost_round"] // 10))])
-    log.info(f"[no-tower] best iteration {booster.best_iteration}, val {dict(booster.best_score['val'])}")
+    rounds = int(num_boost_round or rc["num_boost_round"])
+    callbacks = [lgb.log_evaluation(max(1, rounds // 10))]
+    if early_stopping:
+        callbacks.insert(0, lgb.early_stopping(rc["early_stopping_rounds"], verbose=False))
+    booster = lgb.train(params, dtr, num_boost_round=rounds, valid_sets=[dva], valid_names=["val"],
+                        callbacks=callbacks)
+    log.info(f"[no-tower] {'best' if early_stopping else 'fixed'} iteration {booster.current_iteration()}, "
+             f"val {dict(booster.best_score['val'])}")
     return booster
 
 
@@ -86,10 +89,16 @@ def run(cfg: dict) -> None:
     with_tower = load_json(p.results / "ranker.json")
     with_tower_test = next(r for r in with_tower if "[test]" in r["model"])
     meta = load_json(p.ranker / "ranker_meta.json")
-    matched = min(int(meta["best_iteration"]), booster.current_iteration())
+    matched = int(meta["best_iteration"])
 
     early_rows = _rows(cfg, p, booster, names, "LambdaRank (no tower, early-stopped)", booster.best_iteration)
-    matched_rows = _rows(cfg, p, booster, names, "LambdaRank (no tower, matched rounds)", matched)
+    if matched > booster.current_iteration():        # capacity-matched: retrain with the final ranker's tree count
+        log.info(f"[no-tower] training a capacity-matched model at {matched} rounds")
+        matched_booster = _fit(cfg, p, names, log, num_boost_round=matched, early_stopping=False)
+        matched_booster.save_model(str(p.ranker / "ranker_no_tower_matched.txt"))
+    else:
+        matched_booster = booster
+    matched_rows = _rows(cfg, p, matched_booster, names, f"LambdaRank (no tower, {matched} rounds)", None)
 
     # CSV: test rows for the with-tower reference and both no-tower variants.
     test_rows = [with_tower_test] + [r for r in early_rows + matched_rows if "[test]" in r["model"]]
@@ -98,6 +107,7 @@ def run(cfg: dict) -> None:
 
     payload = {
         "matched_rounds": matched,
+        "matched_retrained": bool(matched > booster.current_iteration()),
         "no_tower_best_iteration": booster.best_iteration,
         "features": len(names),
         "with_tower": with_tower,
