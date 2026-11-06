@@ -9,9 +9,8 @@ from ..metrics import evaluate, per_user_metrics, results_table
 from . import dataset
 
 
-def predict(cfg: dict, p, booster: lgb.Booster, names: list[str], split: str, use_tower: bool = True,
-            user_frac: float = 1.0) -> pl.DataFrame:
-    df = dataset.load(p, [split], cfg, use_tower, user_frac=user_frac)
+def predict(cfg: dict, p, booster: lgb.Booster, names: list[str], split: str, user_frac: float = 1.0) -> pl.DataFrame:
+    df = dataset.load(p, [split], cfg, user_frac=user_frac)
     return df.select("user_id", "wid", "label").with_columns(
         score=pl.Series(booster.predict(df.select(names).to_numpy(), num_threads=0)).cast(pl.Float32))
 

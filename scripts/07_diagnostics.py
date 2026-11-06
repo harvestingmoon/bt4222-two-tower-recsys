@@ -1,9 +1,7 @@
 """Stage 7: diagnostics of the final model -> results/diag_* and figures/diag_*
 
     python scripts/07_diagnostics.py                                  # segments, insights, shap, attention
-    python scripts/07_diagnostics.py --parts segments,insights,shap,attention,ablations
-Tower ablations are trained separately (optional):
-    python scripts/03_train_tower.py --variant no_history && python scripts/04_score_tower.py --variant no_history
+    python scripts/07_diagnostics.py --parts segments,shap
 """
 import sys
 from pathlib import Path
@@ -15,7 +13,7 @@ from jds.config import cli  # noqa: E402
 
 
 def extra(p):
-    p.add_argument("--parts", default="segments,insights,shap,attention", help="comma-separated: segments,insights,shap,attention,ablations")
+    p.add_argument("--parts", default="segments,insights,shap,attention", help="comma-separated: segments,insights,shap,attention")
 
 
 if __name__ == "__main__":

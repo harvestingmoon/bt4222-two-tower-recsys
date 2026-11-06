@@ -102,7 +102,7 @@ They were evaluated on sampled 1:4 lists, which are much easier than ~89-item sl
 *[Answer from the results]*
 
 **Which features matter?**
-→ `diag_shap_groups.csv`, `diag_ablations.csv`
+→ `diag_shap_groups.csv`
 *[Answer from the results]*
 
 **What does the tower attend to?**

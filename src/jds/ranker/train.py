@@ -16,9 +16,9 @@ from ..config import check_fresh, get_logger, paths, save_json
 from . import dataset
 
 
-def fit(cfg: dict, p, names: list[str], use_tower: bool = True, user_frac: float | None = None, tag: str = "ranker",
+def fit(cfg: dict, p, names: list[str], user_frac: float | None = None, tag: str = "ranker",
         log=None) -> lgb.Booster:
-    """Load the rows and fit one ranker, on a share of training users when `user_frac` is set (the ablations do this).
+    """Load the rows and fit one ranker, on a share of training users when `user_frac` is set.
 
     Slates without a positive are dropped: they have no pair to order, so they give LambdaRank nothing to learn from
     and leave NDCG undefined on validation.
@@ -27,8 +27,8 @@ def fit(cfg: dict, p, names: list[str], use_tower: bool = True, user_frac: float
     log = log or get_logger("ranker", p)
     frac = rc["train_user_frac"] if user_frac is None else user_frac
     t0 = time.time()
-    tr = dataset.load(p, ["train"], cfg, use_tower, user_frac=frac, only_with_pos=True)
-    va = dataset.load(p, ["val"], cfg, use_tower, only_with_pos=True)
+    tr = dataset.load(p, ["train"], cfg, user_frac=frac, only_with_pos=True)
+    va = dataset.load(p, ["val"], cfg, only_with_pos=True)
     log.info(f"[{tag}] loaded in {time.time()-t0:.0f}s")
     return fit_frames(cfg, tr, va, names, tag=tag, log=log)
 

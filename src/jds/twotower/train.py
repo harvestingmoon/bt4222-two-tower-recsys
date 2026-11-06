@@ -178,7 +178,7 @@ def score_users(model: TwoTower, st: Stores, feats: ItemFeats, users: np.ndarray
 
 # ---------------------------------------------------------------- training
 def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Stores, a: dict, cfg: dict,
-              device: str, log, use_history: bool = True, use_query: bool = True) -> dict:
+              device: str, log) -> dict:
     """Train one tower model on `train_users` and return its best state (see the module docstring for the objective).
 
     Each step minimises the listwise slate loss; every `aux.every` steps it adds the weighted auxiliary sampled softmax.
@@ -189,7 +189,7 @@ def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Sto
     tc = cfg["tower"]
     set_seed(cfg["seed"])
     rng = np.random.default_rng(cfg["seed"])
-    model = TwoTower(a["n_terms"], [int(x) for x in a["id_sizes"]], tc, use_history, use_query).to(device)
+    model = TwoTower(a["n_terms"], [int(x) for x in a["id_sizes"]], tc).to(device)
     base = ItemFeats(a["X"], device, tc["item_matrix_on_gpu"] and device == "cuda")
     p_wd = float(tc.get("word_dropout", 0.0))
     feats = (lambda idx: word_drop(base(idx), p_wd)) if p_wd > 0 else base   # train only; validation uses `base`
@@ -278,7 +278,7 @@ def train_one(name: str, train_users: np.ndarray, val_users: np.ndarray, st: Sto
         log.info(f"[{name}] epoch {ep} done ({time.time()-t0:.0f}s)")
     if best_state is None:                      # validation users had no positives
         best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
-    return {"state": best_state, "history": history, "use_history": use_history, "use_query": use_query}
+    return {"state": best_state, "history": history}
 
 
 def model_plan(cfg: dict, users: pl.DataFrame) -> list[tuple[str, np.ndarray, np.ndarray]]:
@@ -293,8 +293,8 @@ def model_plan(cfg: dict, users: pl.DataFrame) -> list[tuple[str, np.ndarray, np
     return plan
 
 
-def train(cfg: dict, models: list[str] | None = None, variant: str = "", force: bool = False) -> None:
-    """Train the cross-fitted towers (or one ablation `variant` of the full model: no_history / no_query)."""
+def train(cfg: dict, models: list[str] | None = None, force: bool = False) -> None:
+    """Train the cross-fitted towers."""
     p = paths(cfg)
     log = get_logger("tower", p)
     device = get_device(cfg)
@@ -302,28 +302,22 @@ def train(cfg: dict, models: list[str] | None = None, variant: str = "", force: 
     a = load_assets(p)
     st, users = make_stores(cfg, p, a)
     val_users = users.filter((pl.col("split") == "val") & pl.col("has_pos"))["user_id"].to_numpy()
-    plan = model_plan(cfg, users)
-    if variant:
-        plan = [x for x in plan if x[0] == "full"]
-    for name, tr_users, _ in plan:
+    for name, tr_users, _ in model_plan(cfg, users):
         if models and name not in models:
             continue
-        tag = f"{name}_{variant}" if variant else name
-        out = p.tower / f"{tag}.pt"
+        out = p.tower / f"{name}.pt"
         if out.exists() and not force:
             check_fresh(out, p.data / "users.parquet", p.tower / "assets.npz")
-            log.info(f"[{tag}] exists, skipping (use --force to retrain)")
+            log.info(f"[{name}] exists, skipping (use --force to retrain)")
             continue
-        r = train_one(tag, tr_users, val_users, st, a, cfg, device, log,
-                      use_history=variant != "no_history", use_query=variant != "no_query")
-        torch.save({"state": r["state"], "use_history": r["use_history"], "use_query": r["use_query"],
-                    "tower_cfg": cfg["tower"]}, out)
-        save_json(r["history"], p.tower / f"{tag}_history.json")
+        r = train_one(name, tr_users, val_users, st, a, cfg, device, log)
+        torch.save({"state": r["state"], "tower_cfg": cfg["tower"]}, out)
+        save_json(r["history"], p.tower / f"{name}_history.json")
 
 
 def load_model(path, a: dict, device: str) -> TwoTower:
     ck = torch.load(path, map_location="cpu")
-    m = TwoTower(a["n_terms"], [int(x) for x in a["id_sizes"]], ck["tower_cfg"], ck["use_history"], ck["use_query"])
+    m = TwoTower(a["n_terms"], [int(x) for x in a["id_sizes"]], ck["tower_cfg"])
     m.load_state_dict(ck["state"])
     return m.to(device).eval()
 

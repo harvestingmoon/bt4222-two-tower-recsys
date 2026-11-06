@@ -63,12 +63,12 @@ Self-evaluation table. Fill in effort and effectiveness yourselves.
 |---|---|---|---|
 | 1. Data understanding & features | | | Section 1, window ablation |
 | 2. Prior baseline & gap diagnosis | | | `prior_ncf.json`, `prior_ncf_gaps.json`, prior NCF row in `diag_segments.csv` |
-| 3. Architecture design | | | two-tower with window-aligned segments + cross-fitted LambdaRank; tower ablations `tower_no_history.json`, `tower_no_query.json`, matched no-tower `no_tower_ablation.csv` |
-| 4. Diagnostics & insights | | | `diag_segments.csv`/`.png`, `diag_insights.csv`, `diag_shap*.csv`, `diag_attention.json`, `diag_ablations.csv` |
+| 3. Architecture design | | | two-tower with window-aligned segments + cross-fitted LambdaRank |
+| 4. Diagnostics & insights | | | `diag_segments.csv`/`.png`, `diag_insights.csv`, `diag_shap*.csv`, `diag_attention.json` |
 | 5. Smart use of AI | | | AI interaction log (Section 4) |
 
 **Aspect 2: points for the critique.** Each point has a measured number.
-- The query is never an input, but the task is ranking results *for a query*. Compare with the `no_query` tower ablation.
+- The query is never an input, but the task is ranking results *for a query*. Compare the query-frequency and query-length rows of `diag_segments.csv`.
 - Cold items get no item embedding: `prior_ncf_gaps.json`, displayed items and positives without one. The prior NCF row in the `positive_items` segment of `diag_segments.csv` shows what this costs.
 - The attribute-lookup bug: share of items given another item's attributes, and the published vs fixed rows.
 - It trains on 1:4 sampled lists (~5 items) but is tested on ~89-item slates. Their sampled-list "reference" score vs the full-slate score shows how evaluating on sampled lists inflates results.

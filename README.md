@@ -49,9 +49,9 @@ rebuild all affected stages. Restart the runtime to obtain a fresh checkout of `
 | `step2_features_baselines.ipynb` | ~105 features; non-learned baselines | CPU, ~6 GB RAM |
 | `step3_prior_baseline_ncf.ipynb` | previous team's Hybrid NCF + LSTM and its gap diagnosis | GPU |
 | `step4_window_ablation.ipynb` | same ranker on windowed vs naive history features | CPU |
-| `step5_two_tower.ipynb` | cross-fitted two-tower training and scoring (+ optional ablations) | GPU |
+| `step5_two_tower.ipynb` | cross-fitted two-tower training and scoring | GPU |
 | `step6_ranker_results.ipynb` | LambdaRank re-ranker; final train / val / test tables | CPU, ~15 GB RAM |
-| `step7_diagnostics.ipynb` | segments, insights, SHAP, attention, feature-group ablations | CPU/GPU |
+| `step7_diagnostics.ipynb` | segments, insights, SHAP, attention | CPU/GPU |
 
 Cells that print reported metrics are marked with an orange **★ PERFORMANCE OUTPUT** banner and the best value in each
 metric column is highlighted. On a standard (12 GB RAM) Colab runtime pass `"--set", "ranker.train_user_frac=0.5"` in
@@ -151,7 +151,7 @@ flowchart TD
     F --> K["05 train LambdaRank<br/>train users, early stop on val"]
     S --> K
     K --> X["06 predict<br/>val + test slates"]
-    X --> D["07 diagnostics<br/>segments, insights, SHAP,<br/>attention, ablations"]
+    X --> D["07 diagnostics<br/>segments, insights, SHAP,<br/>attention"]
     B --> X
     N --> X
 ```
@@ -266,26 +266,7 @@ All outputs go to `outputs/<scope>/` (`full`, or `sample_<N>` for a user subsamp
 | `04_score_tower.py` | cross-fitted scores for all 15.5 M displayed items | `tower/tower_scores.parquet`, `results/tower.json` | GPU: est. 5–10 min |
 | `05_train_ranker.py` | LambdaRank on ~137k training slates | `ranker/ranker.txt`, `results/ranker_feature_importance.csv` | CPU: est. 10–30 min, ~15 GB RAM |
 | `06_predict.py` | re-rank val/test (+ 25% of training users for training performance), final tables | `predictions/ranker_{val,test}.parquet`, `results/ranker.json`, `results/summary_test.csv`, `results/summary_all_splits.csv` | ~2 min |
-| `07_diagnostics.py` | segments, behavioural insights, SHAP, tower attention (+ `--parts ablations`: 11 rankers on 30% of users) | `results/diag_*`, `figures/diag_segments.png`, `figures/diag_shap.png` | ~5 min (+ ~1 h with ablations) |
-| `08_no_tower_ablation.py` | matched ranker without the three tower-score features (early-stopped and matched-round variants) | `results/no_tower_ablation.{csv,json}`, `figures/no_tower_ablation.png` | CPU: ~8 min |
-
-Measured sanity check at full scale (CPU, no tower): a features-only ranker trained on 25% of the training users
-reaches test MRR 0.455 / NDCG@10 0.454, against 0.344 / 0.353 for the best non-learned baseline
-(popularity). The full run (all users, plus the tower score) should match or beat this; if
-it does not, something is wrong.
-
-Matched no-tower ablation on the final run: **MRR 0.4579 / NDCG@10 0.4575** at its own early-stopped 718 trees,
-and **0.4591 / 0.4584** when forced to the final ranker's 860 trees, vs **0.4601 / 0.4596** with the tower
-score — a **+0.0010 MRR / +0.0012 NDCG@10** contribution from the tower. See
-`results/no_tower_ablation.csv`.
-
-Optional tower ablations (for the report):
-
-```bash
-python scripts/03_train_tower.py --variant no_history && python scripts/04_score_tower.py --variant no_history
-python scripts/03_train_tower.py --variant no_query   && python scripts/04_score_tower.py --variant no_query
-python scripts/08_no_tower_ablation.py --config configs/default.yaml
-```
+| `07_diagnostics.py` | segments, behavioural insights, SHAP, tower attention | `results/diag_*`, `figures/diag_segments.png`, `figures/diag_shap.png` | ~5 min (+ ~1 h with ablations) |
 
 ---
 
@@ -312,7 +293,7 @@ bash scripts/run_all.sh configs/default.yaml --set scope=sample_30000
 ```
 configs/            default.yaml (full run), smoke.yaml (CPU check)
 data/raw/           the two raw files go here (git-ignored)
-scripts/            00_prepare … 08_no_tower_ablation (incl. 02d_window_ablation), run_all.sh, smoke_test.sh
+scripts/            00_prepare … 07_diagnostics (incl. 02d_window_ablation), run_all.sh, smoke_test.sh
 src/jds/
   config.py         config loading (--config / --set), paths, seeding, device, logging
   prepare.py        stage 0

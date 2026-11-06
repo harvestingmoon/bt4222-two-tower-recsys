@@ -3,7 +3,6 @@
   * segments  - test metrics by user / query segment (activity in the click window, history length, query frequency,
                 query length, whether the positives are cold items, deepest label), incl. the prior team's model
   * insights  - lift of behavioural signals (open carts, repurchase, recent clicks, ...) on engagement
-  * ablations - rankers retrained without one feature group at a time (same user subsample for all)
   * shap      - LightGBM's exact TreeSHAP contributions (pred_contrib) on test rows, aggregated by feature and group
   * attention - how the full tower splits candidate-aware attention between short-window events and the null slot
 """
@@ -22,11 +21,10 @@ import torch  # noqa: E402
 
 from . import features  # noqa: E402
 from .config import get_device, get_logger, load_json, paths, save_json  # noqa: E402
-from .metrics import evaluate, per_user_metrics, results_table  # noqa: E402
+from .metrics import per_user_metrics  # noqa: E402
 from .prepare import load  # noqa: E402
 from .ranker import dataset  # noqa: E402
 from .ranker import infer as rinfer  # noqa: E402
-from .ranker import train as rtrain  # noqa: E402
 
 GROUPS = {   # feature-name prefixes per group (the distinct data-field roles in features.py)
     "two-tower score": ("tower_",),
@@ -163,25 +161,6 @@ def insights(cfg, p, log) -> pl.DataFrame:
     return out
 
 
-def ablations(cfg, p, log) -> pl.DataFrame:
-    """Retrain the ranker without each feature group in turn and compare test metrics with the all-features ranker.
-
-    All rankers use the same user subsample, so the differences reflect the feature group, not the training data.
-    """
-    frac = cfg["diagnostics"]["ablation_user_frac"]
-    names = dataset.feature_names(p)
-    rows = []
-    for g in ["(none)", *GROUPS]:
-        keep = names if g == "(none)" else [n for n in names if group_of(n) != g]
-        b = rtrain.fit(cfg, p, keep, user_frac=frac, tag=f"ablation: {g}", log=log)
-        pred = rinfer.predict(cfg, p, b, keep, "test")
-        rows.append(evaluate(pred, "score", seed=cfg["seed"], name=f"without {g}" if g != "(none)" else "all features"))
-    tbl = results_table(rows)
-    tbl.write_csv(p.results / "diag_ablations.csv")
-    log.info(f"ablations (rankers on {frac:.0%} of training users):\n{tbl}")
-    return tbl
-
-
 def shap(cfg, p, log) -> pl.DataFrame:
     """Mean |SHAP| of the final ranker on a sample of test rows, per feature and summed per feature group."""
     booster = lgb.Booster(model_file=str(p.ranker / "ranker.txt"))
@@ -257,10 +236,4 @@ def run(cfg: dict, parts: list[str]) -> None:
         shap(cfg, p, log)
     if "insights" in parts:
         insights(cfg, p, log)
-    if "ablations" in parts:
-        ablations(cfg, p, log)
-    for v in ("no_history", "no_query"):
-        f = p.results / f"tower_{v}.json"
-        if f.exists():
-            log.info(f"tower ablation {v}: " + str([(r["model"], round(r["mrr"], 4)) for r in load_json(f)]))
     log.info("\n" + str(rinfer.summary(cfg)))

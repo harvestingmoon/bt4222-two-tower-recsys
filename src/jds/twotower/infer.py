@@ -13,17 +13,17 @@ from ..prepare import load
 from .train import ItemFeats, load_assets, load_model, make_stores, model_plan, score_users
 
 
-def score(cfg: dict, variant: str = "", force: bool = False) -> pl.DataFrame:
+def score(cfg: dict, force: bool = False) -> pl.DataFrame:
     """Score every displayed item with the model `model_plan` assigns to its user, save the scores and tower metrics.
 
-    An ablation `variant` only has a `full` model, so only validation and test users are scored. Existing scores are
-    reused unless `force`, after checking that they are newer than the data and checkpoints they came from.
+    Existing scores are reused unless `force`, after checking that they are newer than the data and checkpoints they
+    came from.
     """
     p = paths(cfg)
     log = get_logger("tower", p)
-    out = p.tower / (f"tower_scores_{variant}.parquet" if variant else "tower_scores.parquet")
+    out = p.tower / "tower_scores.parquet"
     if out.exists() and not force:
-        names = [f"full_{variant}"] if variant else [n for n, _, _ in model_plan(cfg, load(p.data, "users"))]
+        names = [n for n, _, _ in model_plan(cfg, load(p.data, "users"))]
         cks = [p.tower / f"{n}.pt" for n in names]
         check_fresh(out, p.data / "users.parquet", *cks)
         log.info(f"{out.name} exists (use --force to rescore)")
@@ -34,11 +34,6 @@ def score(cfg: dict, variant: str = "", force: bool = False) -> pl.DataFrame:
     feats = ItemFeats(a["X"], device, cfg["tower"]["item_matrix_on_gpu"] and device == "cuda")
     parts = []
     for name, _, score_users_ in model_plan(cfg, users):
-        if variant:
-            if name != "full":
-                continue
-            name = f"full_{variant}"
-            score_users_ = users.filter(pl.col("split").is_in(["val", "test"]))["user_id"].to_numpy()
         ck = p.tower / f"{name}.pt"
         if not ck.exists():
             raise FileNotFoundError(f"{ck} missing: run scripts/03_train_tower.py first")
@@ -54,7 +49,7 @@ def score(cfg: dict, variant: str = "", force: bool = False) -> pl.DataFrame:
         d = df.filter(pl.col("split") == sp)
         if d.height and d["label"].max() > 0:
             label = "train (out-of-fold)" if sp == "train" else sp
-            rows.append(evaluate(d, "tower_score", seed=cfg["seed"], name=f"two-tower{'-' + variant if variant else ''} [{label}]"))
-    save_json(rows, p.results / (f"tower_{variant}.json" if variant else "tower.json"))
+            rows.append(evaluate(d, "tower_score", seed=cfg["seed"], name=f"two-tower [{label}]"))
+    save_json(rows, p.results / "tower.json")
     log.info("\n" + str(results_table(rows)))
     return df

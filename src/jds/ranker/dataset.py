@@ -19,26 +19,24 @@ def tower_features(scores: pl.DataFrame) -> pl.DataFrame:
         tower_score_gap=(pl.col("tower_score").max().over("user_id") - pl.col("tower_score")).cast(pl.Float32))
 
 
-def feature_names(p, use_tower: bool = True, drop: tuple[str, ...] = ()) -> list[str]:
-    names = load_json(p.features / "feature_list.json") + (TOWER_FEATURES if use_tower else [])
+def feature_names(p, drop: tuple[str, ...] = ()) -> list[str]:
+    names = load_json(p.features / "feature_list.json") + TOWER_FEATURES
     return [n for n in names if not any(n == d or n.startswith(d) for d in drop)]
 
 
-def load(p, splits, cfg: dict, use_tower: bool = True, user_frac: float = 1.0, tower_file: str = "tower_scores.parquet",
-         only_with_pos: bool = False) -> pl.DataFrame:
+def load(p, splits, cfg: dict, user_frac: float = 1.0, only_with_pos: bool = False) -> pl.DataFrame:
     """Feature rows of the given splits, sorted by user (LightGBM groups must be contiguous)."""
     df = features.read(p, splits=splits, user_frac=user_frac, seed=cfg["seed"])
     if only_with_pos:
         df = df.filter((pl.col("label") > 0).any().over("user_id"))
-    if use_tower:
-        f = p.tower / tower_file
-        if not f.exists():
-            raise FileNotFoundError(f"{f} missing: run scripts/04_score_tower.py first")
-        ts = tower_features(pl.read_parquet(f, columns=["user_id", "wid", "tower_score"]))
-        df = df.join(ts, on=["user_id", "wid"], how="left")
-        miss = df["tower_score"].null_count()
-        if miss:
-            raise ValueError(f"{miss} rows without a tower score (tower scores and features come from different scopes?)")
+    f = p.tower / "tower_scores.parquet"
+    if not f.exists():
+        raise FileNotFoundError(f"{f} missing: run scripts/04_score_tower.py first")
+    ts = tower_features(pl.read_parquet(f, columns=["user_id", "wid", "tower_score"]))
+    df = df.join(ts, on=["user_id", "wid"], how="left")
+    miss = df["tower_score"].null_count()
+    if miss:
+        raise ValueError(f"{miss} rows without a tower score (tower scores and features come from different scopes?)")
     return df.sort("user_id", "wid")
 
 

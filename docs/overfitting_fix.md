@@ -78,23 +78,6 @@ Fix: product flags require a real candidate (`cand > 0`); category flags require
 and a valid history event with a known category. A regression test covers padding, empty history and unknown
 categories. Validation/test remain otherwise unchanged (same features, splits and ranker settings).
 
-## Matched no-tower ablation (v7)
-
-Same users, hand-crafted features and LambdaRank parameters; only `tower_score`, `tower_score_pct` and
-`tower_score_gap` are removed. The no-tower ranker early-stops at 718 rounds (the with-tower ranker at 860).
-
-| model | test MRR | test NDCG@10 |
-|---|---|---|
-| two-tower + LambdaRank (860 trees) | **0.4601** | **0.4596** |
-| LambdaRank, no tower, early-stopped (718 trees) | 0.4579 | 0.4575 |
-| LambdaRank, no tower, matched 860 trees | 0.4591 | 0.4584 |
-| **tower contribution (matched 860)** | **+0.0010** | **+0.0012** |
-
-The tower adds only ~0.001 beyond the hand-crafted features when tree count is held constant. That is an honest
-limitation of the current two-tower design: most of the ranking signal is already in the windowed history,
-popularity, CTR and slate features, and the exported cosine is deliberately popularity-free. The tower is not
-the main driver of the final score in this slate re-ranking setup.
-
 ## Why 0.9 is not reachable
 
 The test slates average 89.2 items with 1.86 positives; 97.7 % of labels are 0 and 23.6 % of users have no positive

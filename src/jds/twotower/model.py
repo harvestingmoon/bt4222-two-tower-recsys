@@ -82,14 +82,13 @@ class QueryUserTower(nn.Module):
 
     Query terms share the item tower's embedding, so query and item text live in one space. Inputs to the output MLP:
     the query, the candidate-aware pooling of the short window, their product, the per-type counts of all three
-    windows, and the exact-match flags. `use_history` / `use_query` = False zero those inputs for the ablations.
+    windows, and the exact-match flags.
     """
 
-    def __init__(self, item_tower: ItemTower, tc: dict, use_history: bool = True, use_query: bool = True):
+    def __init__(self, item_tower: ItemTower, tc: dict):
         super().__init__()
         d, d_term = tc["d"], tc["d_term"]
         self.it = item_tower
-        self.use_history, self.use_query = use_history, use_query
         self.q_proj = nn.Sequential(nn.Linear(d_term, d), nn.GELU(), nn.Linear(d, d))
         self.hq_proj = nn.Linear(d_term, d)                          # query under which a history event happened
         self.type_emb = nn.Embedding(5, d, padding_idx=0)
@@ -109,25 +108,18 @@ class QueryUserTower(nn.Module):
         ctx[segment] = {item [B,L], type, time, query [B,L,Tq], mask [B,L], count [B], tcount [B,5] (4 type counts + log size)}.
         Returns [B,S,D] — one user vector per candidate."""
         q = self.encode_query(q_terms)
-        if not self.use_query:
-            q = torch.zeros_like(q)
         # the caller usually already has these; recomputing the item tower per step is the single biggest cost
         cand_rows = item_feats(cand) if cand_rows is None else cand_rows     # [B,S,N_FEAT]
         cand_v = self.it(cand_rows) if cand_v is None else cand_v           # [B,S,D]
         hist_rows = {s: item_feats(ctx[s]["item"]) for s in MATCH_SEGS}
-        if self.use_history:
-            c = ctx["short"]
-            hq = c["query"].long()
-            h = (self.it(hist_rows["short"]) + self.type_emb(c["type"].long())
-                 + self.time_emb(c["time"].long())
-                 + self.hq_proj(masked_mean(self.it.term(hq), hq > 0)))
-            pooled = self.attn(cand_v, q, h, c["mask"])                # [B,S,D]
-        else:
-            pooled = torch.zeros_like(cand_v)
+        c = ctx["short"]
+        hq = c["query"].long()
+        h = (self.it(hist_rows["short"]) + self.type_emb(c["type"].long())
+             + self.time_emb(c["time"].long())
+             + self.hq_proj(masked_mean(self.it.term(hq), hq > 0)))
+        pooled = self.attn(cand_v, q, h, c["mask"])                    # [B,S,D]
         counts = torch.cat([ctx[s]["tcount"] for s in SEGMENTS], -1).to(q.dtype)   # [B, 5*3]
         flags = self.match_flags(cand_rows, cand, hist_rows, ctx)      # [B,S,N_FLAGS]
-        if not self.use_history:
-            counts, flags = torch.zeros_like(counts), torch.zeros_like(flags)
         qe = q[:, None, :].expand_as(pooled)
         # qe * pooled is an explicit query-history interaction, so the MLP need not learn the product from the concatenation
         z = torch.cat([qe, pooled, qe * pooled, self.count(counts)[:, None, :].expand_as(pooled), flags], -1)
@@ -161,10 +153,10 @@ class TwoTower(nn.Module):
     The exported score is the plain cosine of `user_vec` and `item_vec`; `pop_logit` and `logq` only shape the losses.
     """
 
-    def __init__(self, n_terms: int, id_sizes: list[int], tc: dict, use_history: bool = True, use_query: bool = True):
+    def __init__(self, n_terms: int, id_sizes: list[int], tc: dict):
         super().__init__()
         self.item = ItemTower(n_terms, id_sizes, tc)
-        self.user = QueryUserTower(self.item, tc, use_history=use_history, use_query=use_query)
+        self.user = QueryUserTower(self.item, tc)
         self.log_scale = nn.Parameter(torch.tensor(math.log(20.0)))   # 1 / temperature
         self.pop_w = nn.Parameter(torch.zeros(len(("click", "cart", "order"))))   # popularity offset weights
         self.logq_coef = nn.Parameter(torch.tensor(-4.0))                         # sampled-softmax bias correction
