@@ -133,7 +133,7 @@ def inbatch_loss(u: torch.Tensor, v: torch.Tensor, item_idx: torch.Tensor, w: to
     """Sampled softmax on auxiliary anchors, widened with each anchor's own slate as hard negatives.
 
     Other rows holding the same item are not negatives. `logq_*` subtracts the popularity term, the sampled-softmax
-    bias correction: without it the loss mostly rewards items because they are common, not because the query fits.
+    bias correction: common items appear as negatives more often, so without it the loss pushes them down.
     """
     n = len(u)
     with fp32(u):

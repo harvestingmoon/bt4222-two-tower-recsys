@@ -41,9 +41,10 @@ and validation now runs twice per epoch (`eval_per_epoch: 2`) so the best checkp
 
 Two fixes to the in-batch softmax on historical `(query, item)` pairs:
 
-- **Popularity correction.** In-batch negatives are effectively sampled proportional to frequency, so the loss
-  rewards items for being common. `inbatch_loss` subtracts `model.logq(...)`, a learned multiple of log popularity
-  (the sampled-softmax bias correction).
+- **Popularity correction.** In-batch negatives are effectively sampled proportional to frequency, so common items
+  appear as negatives more often and the uncorrected loss pushes them down, against the slate loss, which rewards
+  them. `inbatch_loss` subtracts `model.logq(...)`, a learned multiple of log popularity (the sampled-softmax bias
+  correction).
 - **Slate hard negatives.** Each anchor also competes against up to `aux.hard_negatives: 8` products from the
   anchor user's slate that were shown and passed over (label 0) — much harder than another anchor's positive.
   `Stores.neg_batch` builds them vectorised; the anchor's own item is excluded and invalid slots are masked. The
