@@ -1,0 +1,225 @@
+{
+  "note": "team3 samples 1:4 positives:negatives per query (mean slate 9.17 vs our 89.2) and prints K=5 metrics under an '@10' label, so its 0.5684 is NDCG@5 on a 9-item list.",
+  "params": {
+    "seed": 42,
+    "neg_ratio": 4,
+    "k_ndcg": [
+      5,
+      10
+    ]
+  },
+  "comparison_test": [
+    {
+      "system": "team3 Hybrid NCF + LSTM (their notebook)",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 25760,
+      "mean_slate": 9.17,
+      "MRR": null,
+      "P@1": null,
+      "NDCG@5": 0.5684,
+      "NDCG@10": null,
+      "HR@10": 0.9782,
+      "source": "their notebook 3.1 (K=5 printed as @10)",
+      "split": "test"
+    },
+    {
+      "system": "two-tower only",
+      "protocol": "full slate",
+      "n_users": 17174,
+      "mean_slate": 89.16,
+      "MRR": 0.1817,
+      "P@1": 0.124,
+      "NDCG@5": 0.1533,
+      "NDCG@10": 0.18,
+      "HR@10": 0.3495,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    },
+    {
+      "system": "two-tower only",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17174,
+      "mean_slate": 9.27,
+      "MRR": 0.5468,
+      "P@1": 0.3354,
+      "NDCG@5": 0.5576,
+      "NDCG@10": 0.61,
+      "HR@10": 0.9928,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    },
+    {
+      "system": "two-tower + LambdaRank",
+      "protocol": "full slate",
+      "n_users": 17174,
+      "mean_slate": 89.16,
+      "MRR": 0.4485,
+      "P@1": 0.3165,
+      "NDCG@5": 0.4054,
+      "NDCG@10": 0.4538,
+      "HR@10": 0.7609,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    },
+    {
+      "system": "two-tower + LambdaRank",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17174,
+      "mean_slate": 9.27,
+      "MRR": 0.815,
+      "P@1": 0.6955,
+      "NDCG@5": 0.7849,
+      "NDCG@10": 0.8125,
+      "HR@10": 0.9992,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    },
+    {
+      "system": "oracle (labels as scores)",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17174,
+      "mean_slate": 9.27,
+      "MRR": 1.0,
+      "P@1": 1.0,
+      "NDCG@5": 1.0,
+      "NDCG@10": 1.0,
+      "HR@10": 1.0,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    }
+  ],
+  "detail_val": [
+    {
+      "system": "two-tower only",
+      "protocol": "full slate",
+      "n_users": 17172,
+      "mean_slate": 89.49,
+      "MRR": 0.186,
+      "P@1": 0.1263,
+      "NDCG@5": 0.1562,
+      "NDCG@10": 0.1841,
+      "HR@10": 0.3586,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "val"
+    },
+    {
+      "system": "two-tower only",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17172,
+      "mean_slate": 9.31,
+      "MRR": 0.5519,
+      "P@1": 0.3402,
+      "NDCG@5": 0.5608,
+      "NDCG@10": 0.6133,
+      "HR@10": 0.9931,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "val"
+    },
+    {
+      "system": "two-tower + LambdaRank",
+      "protocol": "full slate",
+      "n_users": 17172,
+      "mean_slate": 89.49,
+      "MRR": 0.4466,
+      "P@1": 0.3141,
+      "NDCG@5": 0.4028,
+      "NDCG@10": 0.4514,
+      "HR@10": 0.7602,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "val"
+    },
+    {
+      "system": "two-tower + LambdaRank",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17172,
+      "mean_slate": 9.31,
+      "MRR": 0.8123,
+      "P@1": 0.6901,
+      "NDCG@5": 0.7838,
+      "NDCG@10": 0.8105,
+      "HR@10": 0.9992,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "val"
+    },
+    {
+      "system": "oracle (labels as scores)",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17172,
+      "mean_slate": 9.31,
+      "MRR": 1.0,
+      "P@1": 1.0,
+      "NDCG@5": 1.0,
+      "NDCG@10": 1.0,
+      "HR@10": 1.0,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "val"
+    }
+  ],
+  "detail_test": [
+    {
+      "system": "two-tower only",
+      "protocol": "full slate",
+      "n_users": 17174,
+      "mean_slate": 89.16,
+      "MRR": 0.1817,
+      "P@1": 0.124,
+      "NDCG@5": 0.1533,
+      "NDCG@10": 0.18,
+      "HR@10": 0.3495,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    },
+    {
+      "system": "two-tower only",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17174,
+      "mean_slate": 9.27,
+      "MRR": 0.5468,
+      "P@1": 0.3354,
+      "NDCG@5": 0.5576,
+      "NDCG@10": 0.61,
+      "HR@10": 0.9928,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    },
+    {
+      "system": "two-tower + LambdaRank",
+      "protocol": "full slate",
+      "n_users": 17174,
+      "mean_slate": 89.16,
+      "MRR": 0.4485,
+      "P@1": 0.3165,
+      "NDCG@5": 0.4054,
+      "NDCG@10": 0.4538,
+      "HR@10": 0.7609,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    },
+    {
+      "system": "two-tower + LambdaRank",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17174,
+      "mean_slate": 9.27,
+      "MRR": 0.815,
+      "P@1": 0.6955,
+      "NDCG@5": 0.7849,
+      "NDCG@10": 0.8125,
+      "HR@10": 0.9992,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    },
+    {
+      "system": "oracle (labels as scores)",
+      "protocol": "team3 1:4 sampled",
+      "n_users": 17174,
+      "mean_slate": 9.27,
+      "MRR": 1.0,
+      "P@1": 1.0,
+      "NDCG@5": 1.0,
+      "NDCG@10": 1.0,
+      "HR@10": 1.0,
+      "source": "this repo (saved predictions re-scored)",
+      "split": "test"
+    }
+  ]
+}

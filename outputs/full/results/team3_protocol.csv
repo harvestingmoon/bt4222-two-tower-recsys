@@ -1,0 +1,7 @@
+system,protocol,split,n_users,mean_slate,MRR,P@1,NDCG@5,NDCG@10,HR@10,source
+team3 Hybrid NCF + LSTM (their notebook),team3 1:4 sampled,test,25760,9.17,,,0.5684,,0.9782,their notebook 3.1 (K=5 printed as @10)
+two-tower only,full slate,test,17174,89.16,0.1817,0.124,0.1533,0.18,0.3495,this repo (saved predictions re-scored)
+two-tower only,team3 1:4 sampled,test,17174,9.27,0.5468,0.3354,0.5576,0.61,0.9928,this repo (saved predictions re-scored)
+two-tower + LambdaRank,full slate,test,17174,89.16,0.4485,0.3165,0.4054,0.4538,0.7609,this repo (saved predictions re-scored)
+two-tower + LambdaRank,team3 1:4 sampled,test,17174,9.27,0.815,0.6955,0.7849,0.8125,0.9992,this repo (saved predictions re-scored)
+oracle (labels as scores),team3 1:4 sampled,test,17174,9.27,1.0,1.0,1.0,1.0,1.0,this repo (saved predictions re-scored)
